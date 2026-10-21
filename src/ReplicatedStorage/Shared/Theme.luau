@@ -45,6 +45,12 @@ export type Theme = {
 		WidthThin: number,
 		WidthDefault: number,
 		WidthThick: number,
+		WidthHeavy: number,
+	},
+	TextStroke: {
+		Color: Color3,
+		Thickness: number,
+		HeavyThickness: number,
 	},
 	Transitions: {
 		Fast: TweenInfo,
@@ -96,6 +102,12 @@ local Theme: Theme = {
 		WidthThin = 1,
 		WidthDefault = 1.5,
 		WidthThick = 2.5,
+		WidthHeavy = 3.5,
+	},
+	TextStroke = {
+		Color = Color3.fromRGB(8, 10, 16),
+		Thickness = 2,
+		HeavyThickness = 3.5,
 	},
 	Transitions = {
 		Fast = TweenInfo.new(0.1, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
