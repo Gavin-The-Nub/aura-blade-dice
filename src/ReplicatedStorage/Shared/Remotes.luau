@@ -17,6 +17,10 @@ local EVENTS: { string } = {
 	"ToggleAutoTap", -- client -> server: ()
 	"AutoTapStateChanged", -- server -> client: (isEnabled: boolean)
 	"FeverUpdated", -- server -> client: (points: number, maxPoints: number, isActive: boolean, durationRemaining: number)
+	"Roll", -- client -> server: ()
+	"RollResult", -- server -> client: (success: boolean, swordData: any, isAuto: boolean, message: string?)
+	"ToggleAutoRoll", -- client -> server: ()
+	"AutoRollStateChanged", -- server -> client: (isEnabled: boolean)
 }
 local FUNCTIONS: { string } = {
 	"GetInitialData", -- client -> server: () -> DataTemplate.PlayerData?

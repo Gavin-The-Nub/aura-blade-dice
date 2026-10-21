@@ -10,17 +10,24 @@ local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Theme = require(Shared:WaitForChild("Theme"))
 local NumberFormat = require(Shared:WaitForChild("NumberFormat"))
 local Assets = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Assets"))
+local Swords = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Swords"))
 
 local Components = script.Parent.Parent:WaitForChild("Components")
 local Popup = require(Components:WaitForChild("Popup"))
+local Button = require(Components:WaitForChild("Button"))
 
 export type MainHUDInstance = {
 	Gui: ScreenGui,
 	UpdateGold: (self: MainHUDInstance, amount: number) -> (),
 	UpdateFever: (self: MainHUDInstance, points: number, maxPoints: number, isActive: boolean, durationRemaining: number) -> (),
 	SetAutoTapState: (self: MainHUDInstance, isEnabled: boolean) -> (),
+	SetAutoRollState: (self: MainHUDInstance, isEnabled: boolean) -> (),
 	SetOnTap: (self: MainHUDInstance, callback: (Vector2) -> ()) -> (),
 	SetOnAutoTapToggle: (self: MainHUDInstance, callback: () -> ()) -> (),
+	SetOnRoll: (self: MainHUDInstance, callback: () -> ()) -> (),
+	SetOnAutoRollToggle: (self: MainHUDInstance, callback: () -> ()) -> (),
+	ShowRollPopup: (self: MainHUDInstance, swordDef: any) -> (),
+	ShowRollToast: (self: MainHUDInstance, swordOrText: any, isError: boolean?) -> (),
 	SpawnFloatingNumber: (self: MainHUDInstance, pos: Vector2, amount: number, isCrit: boolean) -> (),
 	Destroy: (self: MainHUDInstance) -> (),
 }
@@ -348,6 +355,159 @@ function MainHUD.new(parentGui: Instance): MainHUDInstance
 	local backpackPopup = createPlaceholderPopup("Backpack & Swords", "Equip your strongest blade and place backup swords on pedestals.")
 	local upgradesPopup = createPlaceholderPopup("Blade Upgrades", "Master Appraiser: Roll Grades and Enchants onto your blades.")
 
+	-- Roll Result Popup (Modal for Manual Rolls)
+	local rollPopup = Popup.new({
+		Title = "Blade Pulled!",
+		Size = UDim2.new(0.85, 0, 0.42, 0),
+		MaxWidth = 400,
+		MaxHeight = 280,
+		Parent = screenGui,
+	})
+
+	local rollPopupRarityLabel = Instance.new("TextLabel")
+	rollPopupRarityLabel.Name = "RarityLabel"
+	rollPopupRarityLabel.Size = UDim2.new(1, 0, 0, 22)
+	rollPopupRarityLabel.Position = UDim2.new(0, 0, 0, 8)
+	rollPopupRarityLabel.BackgroundTransparency = 1
+	rollPopupRarityLabel.Font = Theme.Fonts.Title
+	rollPopupRarityLabel.TextSize = 15
+	rollPopupRarityLabel.TextColor3 = Theme.Colors.AuraCyan
+	rollPopupRarityLabel.Text = "RARE (1 in 1,200)"
+	rollPopupRarityLabel.Parent = rollPopup.Content
+
+	local rollPopupSwordLabel = Instance.new("TextLabel")
+	rollPopupSwordLabel.Name = "SwordLabel"
+	rollPopupSwordLabel.Size = UDim2.new(1, 0, 0, 36)
+	rollPopupSwordLabel.Position = UDim2.new(0, 0, 0, 32)
+	rollPopupSwordLabel.BackgroundTransparency = 1
+	rollPopupSwordLabel.Font = Theme.Fonts.Title
+	rollPopupSwordLabel.TextSize = 22
+	rollPopupSwordLabel.TextColor3 = Theme.Colors.TextPrimary
+	rollPopupSwordLabel.Text = "Static Katana"
+	rollPopupSwordLabel.Parent = rollPopup.Content
+
+	local swordStroke = Instance.new("UIStroke")
+	swordStroke.Color = Theme.TextStroke.Color
+	swordStroke.Thickness = 2
+	swordStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Contextual
+	swordStroke.Parent = rollPopupSwordLabel
+
+	local rollPopupDamageLabel = Instance.new("TextLabel")
+	rollPopupDamageLabel.Name = "DamageLabel"
+	rollPopupDamageLabel.Size = UDim2.new(1, 0, 0, 20)
+	rollPopupDamageLabel.Position = UDim2.new(0, 0, 0, 72)
+	rollPopupDamageLabel.BackgroundTransparency = 1
+	rollPopupDamageLabel.Font = Theme.Fonts.Body
+	rollPopupDamageLabel.TextSize = 13
+	rollPopupDamageLabel.TextColor3 = Theme.Colors.TextSecondary
+	rollPopupDamageLabel.Text = "Base Damage: 280 Gold/Tap"
+	rollPopupDamageLabel.Parent = rollPopup.Content
+
+	local claimButton = Button.new({
+		Name = "ClaimButton",
+		Text = "OK",
+		Size = UDim2.new(0.6, 0, 0, 38),
+		Position = UDim2.new(0.5, 0, 1, -8),
+		AnchorPoint = Vector2.new(0.5, 1),
+		BackgroundColor = Theme.Colors.ButtonPrimary,
+		BorderColor = Theme.Colors.AuraCyan,
+		TextColor = Theme.Colors.TextPrimary,
+		CornerRadius = Theme.Corner.Medium,
+		Parent = rollPopup.Content,
+		OnClick = function()
+			rollPopup:Close()
+		end,
+	})
+
+	local function showRollPopup(swordDef: any)
+		local rarityColor = (Swords.RarityColors and Swords.RarityColors[swordDef.rarity]) or Theme.Colors.AuraCyan
+		rollPopupRarityLabel.Text = ("%s (1 in %s)"):format(string.upper(swordDef.rarity), NumberFormat.format(swordDef.baseOdds))
+		rollPopupRarityLabel.TextColor3 = rarityColor
+		rollPopupSwordLabel.Text = swordDef.name
+		rollPopupSwordLabel.TextColor3 = rarityColor
+		rollPopupDamageLabel.Text = ("Base Damage: %s Gold/Tap"):format(NumberFormat.format(swordDef.baseDamage))
+
+		local claimStroke = claimButton.Instance:FindFirstChildOfClass("UIStroke")
+		if claimStroke then
+			claimStroke.Color = rarityColor
+		end
+
+		rollPopup:Open()
+	end
+
+	-- Auto-Roll Toast (Non-blocking notification)
+	local toastFrame = Instance.new("Frame")
+	toastFrame.Name = "RollToast"
+	toastFrame.Size = UDim2.new(0, 310, 0, 36)
+	toastFrame.Position = UDim2.new(0.5, 0, 1, -128)
+	toastFrame.AnchorPoint = Vector2.new(0.5, 1)
+	toastFrame.BackgroundColor3 = Theme.Colors.BackgroundDark
+	toastFrame.BackgroundTransparency = 0.15
+	toastFrame.Visible = false
+	toastFrame.Active = false -- Never blocks clicks or taps!
+	toastFrame.ZIndex = 8
+	toastFrame.Parent = root
+
+	local toastCorner = Instance.new("UICorner")
+	toastCorner.CornerRadius = Theme.Corner.Medium
+	toastCorner.Parent = toastFrame
+
+	local toastStroke = Instance.new("UIStroke")
+	toastStroke.Color = Theme.Colors.Border
+	toastStroke.Thickness = Theme.Stroke.WidthDefault
+	toastStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+	toastStroke.Parent = toastFrame
+
+	local toastLabel = Instance.new("TextLabel")
+	toastLabel.Name = "ToastLabel"
+	toastLabel.Size = UDim2.new(1, -16, 1, 0)
+	toastLabel.Position = UDim2.new(0.5, 0, 0.5, 0)
+	toastLabel.AnchorPoint = Vector2.new(0.5, 0.5)
+	toastLabel.BackgroundTransparency = 1
+	toastLabel.Font = Theme.Fonts.Button
+	toastLabel.TextSize = 13
+	toastLabel.TextColor3 = Theme.Colors.TextPrimary
+	toastLabel.Text = ""
+	toastLabel.Active = false
+	toastLabel.ZIndex = 9
+	toastLabel.Parent = toastFrame
+
+	local toastThread: thread? = nil
+	local function showRollToast(swordOrText: any, isError: boolean?)
+		if toastThread then
+			task.cancel(toastThread)
+			toastThread = nil
+		end
+
+		if isError then
+			toastStroke.Color = Theme.Colors.ButtonClose
+			toastLabel.TextColor3 = Theme.Colors.ButtonClose
+			toastLabel.Text = tostring(swordOrText)
+		elseif type(swordOrText) == "table" and swordOrText.name then
+			local rarityColor = (Swords.RarityColors and Swords.RarityColors[swordOrText.rarity]) or Theme.Colors.AuraCyan
+			toastStroke.Color = rarityColor
+			toastLabel.TextColor3 = rarityColor
+			toastLabel.Text = ("Rolled: [%s] (%s)"):format(swordOrText.name, swordOrText.rarity)
+		else
+			toastStroke.Color = Theme.Colors.Border
+			toastLabel.TextColor3 = Theme.Colors.TextPrimary
+			toastLabel.Text = tostring(swordOrText)
+		end
+
+		toastFrame.Visible = true
+		toastFrame.Position = UDim2.new(0.5, 0, 1, -122)
+		TweenService:Create(toastFrame, Theme.Transitions.Pop, { Position = UDim2.new(0.5, 0, 1, -128) }):Play()
+
+		toastThread = task.delay(2.2, function()
+			local fade = TweenService:Create(toastFrame, Theme.Transitions.Fast, { BackgroundTransparency = 1 })
+			fade:Play()
+			fade.Completed:Connect(function()
+				toastFrame.Visible = false
+				toastFrame.BackgroundTransparency = 0.15
+			end)
+		end)
+	end
+
 	createHudImageButton({
 		Name = "BackpackButton",
 		Text = "Swords",
@@ -364,6 +524,8 @@ function MainHUD.new(parentGui: Instance): MainHUDInstance
 		end,
 	})
 
+	local onRollCallback: (() -> ())? = nil
+
 	-- Large central ROLL button
 	createHudImageButton({
 		Name = "RollButton",
@@ -378,11 +540,9 @@ function MainHUD.new(parentGui: Instance): MainHUDInstance
 		LayoutOrder = 2,
 		Parent = bottomContainer,
 		OnClick = function()
-			-- Placeholder until RollService is built
-			goldLabel.TextColor3 = Theme.Colors.AuraCyan
-			task.delay(0.2, function()
-				goldLabel.TextColor3 = Theme.Colors.TextGold
-			end)
+			if onRollCallback then
+				onRollCallback()
+			end
 		end,
 	})
 
@@ -560,6 +720,102 @@ function MainHUD.new(parentGui: Instance): MainHUDInstance
 		end
 	end
 
+	-- 7. Auto-Roll Toggle Button: Positioned directly above Auto-Tap
+	local autoRollButton = Instance.new("ImageButton")
+	autoRollButton.Name = "AutoRollButton"
+	autoRollButton.Size = UDim2.new(0, 68, 0, 58)
+	autoRollButton.Position = UDim2.new(1, -20, 1, -86)
+	autoRollButton.AnchorPoint = Vector2.new(1, 1)
+	autoRollButton.BackgroundColor3 = Theme.Colors.ButtonSecondary
+	autoRollButton.AutoButtonColor = false
+	autoRollButton.ZIndex = 5
+	autoRollButton.Parent = root
+
+	local autoRollCorner = Instance.new("UICorner")
+	autoRollCorner.CornerRadius = Theme.Corner.Medium
+	autoRollCorner.Parent = autoRollButton
+
+	local autoRollStroke = Instance.new("UIStroke")
+	autoRollStroke.Color = Theme.Colors.Border
+	autoRollStroke.Thickness = Theme.Stroke.WidthDefault
+	autoRollStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+	autoRollStroke.Parent = autoRollButton
+
+	local autoRollScale = Instance.new("UIScale")
+	autoRollScale.Scale = 1
+	autoRollScale.Parent = autoRollButton
+
+	local autoRollIcon = Instance.new("TextLabel")
+	autoRollIcon.Name = "Icon"
+	autoRollIcon.Size = UDim2.new(1, 0, 0.45, 0)
+	autoRollIcon.Position = UDim2.new(0.5, 0, 0.1, 0)
+	autoRollIcon.AnchorPoint = Vector2.new(0.5, 0)
+	autoRollIcon.BackgroundTransparency = 1
+	autoRollIcon.Text = "🎲"
+	autoRollIcon.TextScaled = true
+	autoRollIcon.Font = Theme.Fonts.Title
+	autoRollIcon.ZIndex = 6
+	autoRollIcon.Parent = autoRollButton
+
+	local autoRollLabel = Instance.new("TextLabel")
+	autoRollLabel.Name = "Label"
+	autoRollLabel.Size = UDim2.new(1, -4, 0.35, 0)
+	autoRollLabel.Position = UDim2.new(0.5, 0, 0.94, 0)
+	autoRollLabel.AnchorPoint = Vector2.new(0.5, 1)
+	autoRollLabel.BackgroundTransparency = 1
+	autoRollLabel.Text = "ROLL: OFF"
+	autoRollLabel.TextColor3 = Theme.Colors.TextMuted
+	autoRollLabel.Font = Theme.Fonts.Button
+	autoRollLabel.TextSize = 10
+	autoRollLabel.ZIndex = 6
+	autoRollLabel.Parent = autoRollButton
+
+	local autoRollLabelStroke = Instance.new("UIStroke")
+	autoRollLabelStroke.Color = Theme.TextStroke.Color
+	autoRollLabelStroke.Thickness = 1.5
+	autoRollLabelStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Contextual
+	autoRollLabelStroke.Parent = autoRollLabel
+
+	autoRollButton.MouseEnter:Connect(function()
+		TweenService:Create(autoRollScale, Theme.Transitions.Fast, { Scale = 1.05 }):Play()
+	end)
+	autoRollButton.MouseLeave:Connect(function()
+		TweenService:Create(autoRollScale, Theme.Transitions.Fast, { Scale = 1.0 }):Play()
+	end)
+	autoRollButton.InputBegan:Connect(function(input)
+		if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+			TweenService:Create(autoRollScale, Theme.Transitions.Fast, { Scale = 0.93 }):Play()
+		end
+	end)
+	autoRollButton.InputEnded:Connect(function(input)
+		if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+			TweenService:Create(autoRollScale, Theme.Transitions.Fast, { Scale = 1.0 }):Play()
+		end
+	end)
+
+	local onAutoRollToggleCallback: (() -> ())? = nil
+	autoRollButton.Activated:Connect(function()
+		if onAutoRollToggleCallback then
+			onAutoRollToggleCallback()
+		end
+	end)
+
+	local function setAutoRollVisuals(isEnabled: boolean)
+		if isEnabled then
+			autoRollStroke.Color = Theme.Colors.AuraGold
+			autoRollStroke.Thickness = Theme.Stroke.WidthThick
+			autoRollButton.BackgroundColor3 = Color3.fromRGB(48, 40, 18)
+			autoRollLabel.Text = "ROLL: ON"
+			autoRollLabel.TextColor3 = Theme.Colors.AuraGold
+		else
+			autoRollStroke.Color = Theme.Colors.Border
+			autoRollStroke.Thickness = Theme.Stroke.WidthDefault
+			autoRollButton.BackgroundColor3 = Theme.Colors.ButtonSecondary
+			autoRollLabel.Text = "ROLL: OFF"
+			autoRollLabel.TextColor3 = Theme.Colors.TextMuted
+		end
+	end
+
 	local feverCountdownThread: thread? = nil
 	local isCurrentlyFever = false
 
@@ -674,11 +930,26 @@ function MainHUD.new(parentGui: Instance): MainHUDInstance
 		SetAutoTapState = function(_, isEnabled: boolean)
 			setAutoTapVisuals(isEnabled)
 		end,
+		SetAutoRollState = function(_, isEnabled: boolean)
+			setAutoRollVisuals(isEnabled)
+		end,
 		SetOnTap = function(_, callback: (Vector2) -> ())
 			onTapCallback = callback
 		end,
 		SetOnAutoTapToggle = function(_, callback: () -> ())
 			onAutoTapToggleCallback = callback
+		end,
+		SetOnRoll = function(_, callback: () -> ())
+			onRollCallback = callback
+		end,
+		SetOnAutoRollToggle = function(_, callback: () -> ())
+			onAutoRollToggleCallback = callback
+		end,
+		ShowRollPopup = function(_, swordDef: any)
+			showRollPopup(swordDef)
+		end,
+		ShowRollToast = function(_, swordOrText: any, isError: boolean?)
+			showRollToast(swordOrText, isError)
 		end,
 		SpawnFloatingNumber = function(_, pos: Vector2, amount: number, isCrit: boolean)
 			spawnFloatingDamageNumber(pos, amount, isCrit)

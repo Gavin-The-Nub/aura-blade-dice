@@ -19,6 +19,9 @@ local Game = {
 	AutoTap = {
 		BaseTapsPerSecond = 10, -- Base auto-tap rate (matches MaxTapsPerSecond)
 	},
+	Inventory = {
+		MaxSwords = 50, -- Maximum number of swords a player can store
+	},
 }
 
 return Game

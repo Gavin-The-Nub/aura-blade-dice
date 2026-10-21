@@ -36,7 +36,9 @@ end)
 
 local Controllers = script.Parent
 local TapController = require(Controllers:WaitForChild("TapController"))
+local RollController = require(Controllers:WaitForChild("RollController"))
 
--- Initialize TapController with the HUD instance
+-- Initialize controllers with the HUD instance
 TapController.Init(hud)
+RollController.Init(hud)
 

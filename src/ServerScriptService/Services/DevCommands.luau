@@ -13,6 +13,7 @@ local TextChatService = game:GetService("TextChatService")
 
 local DataService = require(ServerScriptService.Services.DataService)
 local TapService = require(ServerScriptService.Services.TapService)
+local RollService = require(ServerScriptService.Services.RollService)
 local NumberFormat = require(ReplicatedStorage.Shared.NumberFormat)
 local Remotes = require(ReplicatedStorage.Shared.Remotes)
 
@@ -70,6 +71,34 @@ local function onFeverCommand(originTextSource: TextSource, unfilteredText: stri
 	end
 end
 
+local function onRollTestCommand(originTextSource: TextSource, unfilteredText: string)
+	local player = Players:GetPlayerByUserId(originTextSource.UserId)
+	if player == nil then
+		return
+	end
+
+	local arg = unfilteredText:match("^%S+%s+(%S+)")
+	local count = tonumber(arg) or 500
+	if count <= 0 then
+		count = 500
+	end
+
+	local sim = RollService.SimulateRolls(player, count)
+
+	print(("[DevCommands] ====== Roll Distribution Test (%d Rolls, Luck: %.1fx) ======"):format(sim.Count, sim.TotalLuck))
+	for _, rarity in { "Common", "Uncommon", "Rare", "Epic", "Legendary", "Mythic", "Secret" } do
+		local c = sim.CountsByRarity[rarity] or 0
+		local exp = (sim.ExpectedRarity[rarity] or 0) * 100
+		local actual = (c / sim.Count) * 100
+		if c > 0 or exp > 0.001 then
+			print(("[DevCommands] %-10s : %5d (%6.2f%%) | Expected: %6.2f%%"):format(rarity, c, actual, exp))
+		end
+	end
+	print("[DevCommands] ===============================================================")
+
+	say(player, ("[RollTest] Ran %d rolls (Luck: %.1fx). Rarity distribution printed to Output!"):format(sim.Count, sim.TotalLuck))
+end
+
 function DevCommands.Start()
 	if not RunService:IsStudio() then
 		return
@@ -86,6 +115,12 @@ function DevCommands.Start()
 	feverCommand.PrimaryAlias = "/fever"
 	feverCommand.Triggered:Connect(onFeverCommand)
 	feverCommand.Parent = TextChatService
+
+	local rollTestCommand = Instance.new("TextChatCommand")
+	rollTestCommand.Name = "DevRollTestCommand"
+	rollTestCommand.PrimaryAlias = "/rolltest"
+	rollTestCommand.Triggered:Connect(onRollTestCommand)
+	rollTestCommand.Parent = TextChatService
 end
 
 return DevCommands
