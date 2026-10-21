@@ -21,6 +21,7 @@ Out (do NOT build): Relic Accessories (removed), splash damage (removed, there i
 1. **The server is the authority.** The client only sends intent ("I tapped", "I want to roll", "buy Dice 3"). The server decides Gold earned, roll results, crits, costs, and rewards. Never trust any number sent from the client.
 2. **Validate every RemoteEvent / RemoteFunction** on the server: check argument types, check the player can afford it or owns it, and rate-limit it (taps and rolls especially). Reject bad input silently.
 3. **Data-driven design.** All content (Dice, Swords, Grades, Enchants, Blessings, Rebirths, Trials, events) lives in ModuleScripts under `ReplicatedStorage/Config`. Gameplay code reads from these. Never hardcode a sword's stats inside logic.
+   - *Note:* The temporary `test_sword` fallback in `TapService` and entry in `Config/Swords` must be removed when the real sword inventory/equip feature is built.
 4. **Save data safely.** Use DataStore (or ProfileStore) with `pcall`, retries, and session locking. Save on leave, on a timer, and on `BindToClose`. Never wipe a profile if loading fails; kick the player with a message instead.
 5. **One feature per task.** Don't refactor or change unrelated systems. If you think something else needs changing, tell me first.
 6. **Plan before code.** For any new feature, give a short plan (files you'll touch, remotes you'll add, data fields you'll add) and wait for my OK.

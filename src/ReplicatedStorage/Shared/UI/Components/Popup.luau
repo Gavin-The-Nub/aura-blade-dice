@@ -37,7 +37,8 @@ function Popup.new(config: PopupConfig): PopupComponent
 	scrim.BackgroundColor3 = Theme.Colors.PanelOverlay
 	scrim.BackgroundTransparency = 1
 	scrim.Visible = false
-	scrim.Active = true -- blocks clicks from reaching the tap layer
+	scrim.Active = false -- only active when open to prevent blocking taps when hidden
+	scrim.ZIndex = 10
 
 	-- Centered Dialog Box
 	local dialog = Instance.new("Frame")
@@ -122,6 +123,7 @@ function Popup.new(config: PopupConfig): PopupComponent
 
 	local function openDialog()
 		isOpen = true
+		scrim.Active = true
 		scrim.Visible = true
 		dialogScale.Scale = 0.8
 		TweenService:Create(scrim, Theme.Transitions.Smooth, { BackgroundTransparency = 0.35 }):Play()
@@ -131,6 +133,7 @@ function Popup.new(config: PopupConfig): PopupComponent
 	local function closeDialog()
 		if not isOpen then return end
 		isOpen = false
+		scrim.Active = false
 		local tween = TweenService:Create(dialogScale, Theme.Transitions.Fast, { Scale = 0.85 })
 		TweenService:Create(scrim, Theme.Transitions.Fast, { BackgroundTransparency = 1 }):Play()
 		tween:Play()

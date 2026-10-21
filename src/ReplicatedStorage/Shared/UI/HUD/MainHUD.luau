@@ -18,6 +18,7 @@ export type MainHUDInstance = {
 	Gui: ScreenGui,
 	UpdateGold: (self: MainHUDInstance, amount: number) -> (),
 	SetOnTap: (self: MainHUDInstance, callback: (Vector2) -> ()) -> (),
+	SpawnFloatingNumber: (self: MainHUDInstance, pos: Vector2, amount: number, isCrit: boolean) -> (),
 	Destroy: (self: MainHUDInstance) -> (),
 }
 
@@ -232,18 +233,12 @@ function MainHUD.new(parentGui: Instance): MainHUDInstance
 	goldStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Contextual
 	goldStroke.Parent = goldLabel
 
-	-- Modals container for dialog popups
-	local modalContainer = Instance.new("Frame")
-	modalContainer.Name = "Modals"
-	modalContainer.Size = UDim2.new(1, 0, 1, 0)
-	modalContainer.BackgroundTransparency = 1
-	modalContainer.ZIndex = 10
-	modalContainer.Parent = screenGui
+
 
 	local function createPlaceholderPopup(title: string, desc: string): Popup.PopupComponent
 		local popup = Popup.new({
 			Title = title,
-			Parent = modalContainer,
+			Parent = screenGui,
 		})
 		local descLabel = Instance.new("TextLabel")
 		descLabel.Name = "Description"
@@ -404,6 +399,67 @@ function MainHUD.new(parentGui: Instance): MainHUDInstance
 		end,
 	})
 
+	local activeDamageNumbers = 0
+	local MAX_ACTIVE_DAMAGE_NUMBERS = 20
+
+	local function spawnFloatingDamageNumber(pos: Vector2, amount: number, isCrit: boolean)
+		if activeDamageNumbers >= MAX_ACTIVE_DAMAGE_NUMBERS then
+			return
+		end
+		activeDamageNumbers += 1
+
+		local label = Instance.new("TextLabel")
+		label.Name = "DamageNumber"
+		label.AnchorPoint = Vector2.new(0.5, 0.5)
+		-- Add slight random offset for readability when tapping repeatedly in the same spot
+		local offsetX = math.random(-20, 20)
+		local offsetY = math.random(-10, 10)
+		label.Position = UDim2.new(0, pos.X + offsetX, 0, pos.Y + offsetY)
+		label.BackgroundTransparency = 1
+		label.Active = false
+		label.ZIndex = 8
+
+		local formattedAmount = NumberFormat.format(amount)
+		if isCrit then
+			label.Text = "+" .. formattedAmount .. " CRIT!"
+			label.TextColor3 = Theme.Colors.TextCrit or Color3.fromRGB(255, 170, 0)
+			label.TextSize = 34
+			label.Font = Theme.Fonts.Title
+		else
+			label.Text = "+" .. formattedAmount
+			label.TextColor3 = Theme.Colors.TextPrimary
+			label.TextSize = 22
+			label.Font = Theme.Fonts.Body
+		end
+
+		local stroke = Instance.new("UIStroke")
+		stroke.Color = Theme.TextStroke.Color
+		stroke.Thickness = if isCrit then 2.5 else 1.5
+		stroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Contextual
+		stroke.Parent = label
+
+		label.Parent = root
+
+		-- Floating up and fading out animation
+		local targetY = label.Position.Y.Offset - (if isCrit then 60 else 40)
+		local tweenInfo = TweenInfo.new(0.65, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+		local tween = TweenService:Create(label, tweenInfo, {
+			Position = UDim2.new(0, label.Position.X.Offset, 0, targetY),
+			TextTransparency = 1,
+		})
+		local strokeTween = TweenService:Create(stroke, tweenInfo, {
+			Transparency = 1,
+		})
+
+		tween:Play()
+		strokeTween:Play()
+
+		tween.Completed:Connect(function()
+			label:Destroy()
+			activeDamageNumbers -= 1
+		end)
+	end
+
 	local self: MainHUDInstance = {
 		Gui = screenGui,
 		UpdateGold = function(_, amount: number)
@@ -411,6 +467,9 @@ function MainHUD.new(parentGui: Instance): MainHUDInstance
 		end,
 		SetOnTap = function(_, callback: (Vector2) -> ())
 			onTapCallback = callback
+		end,
+		SpawnFloatingNumber = function(_, pos: Vector2, amount: number, isCrit: boolean)
+			spawnFloatingDamageNumber(pos, amount, isCrit)
 		end,
 		Destroy = function(_)
 			screenGui:Destroy()

@@ -12,6 +12,8 @@ local FOLDER_NAME = "Remotes"
 local EVENTS: { string } = {
 	"DevMessage", -- server -> client text for Studio-only dev commands (DevCommands)
 	"DataChanged", -- server -> client: (key: string, value: any)
+	"Tap", -- client -> server: ()
+	"TapResult", -- server -> client: (goldEarned: number, isCrit: boolean)
 }
 local FUNCTIONS: { string } = {
 	"GetInitialData", -- client -> server: () -> DataTemplate.PlayerData?

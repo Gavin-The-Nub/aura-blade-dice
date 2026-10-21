@@ -9,6 +9,15 @@ export type SwordDef = {
 	baseDamage: number, -- Gold per tap
 }
 
-local Swords: { SwordDef } = {}
+-- TEMP: temporary test sword for TapService validation. Remove or replace in equip feature step.
+local Swords: { SwordDef } = {
+	{
+		id = "test_sword",
+		name = "Test Sword",
+		rarity = "Common",
+		baseOdds = 1,
+		baseDamage = 1,
+	},
+}
 
 return Swords

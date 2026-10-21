@@ -34,7 +34,9 @@ task.spawn(function()
 	end
 end)
 
--- Tap area handler (ready for TapService / weapon slash integration)
-hud:SetOnTap(function(position: Vector2)
-	-- Tap input captured
-end)
+local Controllers = script.Parent
+local TapController = require(Controllers:WaitForChild("TapController"))
+
+-- Initialize TapController with the HUD instance
+TapController.Init(hud)
+
