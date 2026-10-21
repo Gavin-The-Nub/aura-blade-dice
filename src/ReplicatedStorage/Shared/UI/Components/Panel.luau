@@ -25,6 +25,7 @@ export type PanelComponent = {
 	Instance: Frame,
 	Content: Frame,
 	SetVisible: (self: PanelComponent, visible: boolean) -> (),
+	SetBorderColor: (self: PanelComponent, color: Color3) -> (),
 	Destroy: (self: PanelComponent) -> (),
 }
 
@@ -75,6 +76,9 @@ function Panel.new(config: PanelConfig): PanelComponent
 		Content = content,
 		SetVisible = function(_, visible: boolean)
 			frame.Visible = visible
+		end,
+		SetBorderColor = function(_, color: Color3)
+			stroke.Color = color
 		end,
 		Destroy = function(_)
 			frame:Destroy()

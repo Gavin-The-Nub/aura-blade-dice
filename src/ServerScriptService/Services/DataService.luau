@@ -103,6 +103,39 @@ local function onPlayerAdded(player: Player)
 
 	profile:Reconcile() -- add any template fields this old profile is missing
 
+	-- Ensure AutoSellRules has all rarity keys even if loaded from an older profile shape
+	if type(profile.Data.AutoSellRules) ~= "table" then
+		local copy = {}
+		for k, v in DataTemplate.AutoSellRules do
+			copy[k] = v
+		end
+		profile.Data.AutoSellRules = copy
+	else
+		for k, v in DataTemplate.AutoSellRules do
+			if profile.Data.AutoSellRules[k] == nil then
+				profile.Data.AutoSellRules[k] = v
+			end
+		end
+	end
+
+	-- Reset EquippedSword to "" if its uid isn't owned
+	local equippedUid = profile.Data.EquippedSword
+	if type(equippedUid) == "string" and equippedUid ~= "" then
+		local owned = profile.Data.OwnedSwords
+		local found = false
+		if type(owned) == "table" then
+			for _, entry in owned do
+				if type(entry) == "table" and entry.uid == equippedUid then
+					found = true
+					break
+				end
+			end
+		end
+		if not found then
+			profile.Data.EquippedSword = ""
+		end
+	end
+
 	profile.OnSessionEnd:Connect(function()
 		-- Fires when another server steals the session (or on release). Only kick on a steal.
 		if profiles[player] == profile then

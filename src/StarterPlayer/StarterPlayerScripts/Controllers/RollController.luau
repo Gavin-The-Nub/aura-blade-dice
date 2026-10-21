@@ -37,17 +37,18 @@ function RollController.Init(hud: MainHUDInstance)
 	end)
 
 	-- Listen for verified roll results from the server
-	rollResultEvent.OnClientEvent:Connect(function(success: unknown, swordData: unknown, isAuto: unknown, message: unknown)
+	rollResultEvent.OnClientEvent:Connect(function(success: unknown, swordData: unknown, isAuto: unknown, message: unknown, isAutoSold: unknown)
 		local ok = success == true
 		local auto = isAuto == true
+		local autoSold = isAutoSold == true
 
 		if ok and type(swordData) == "table" then
 			if auto then
 				-- Non-blocking toast for Auto-Roll
-				hud:ShowRollToast(swordData, false)
+				hud:ShowRollToast(swordData, false, autoSold)
 			else
 				-- Modal popup for manual roll
-				hud:ShowRollPopup(swordData)
+				hud:ShowRollPopup(swordData, autoSold)
 			end
 		else
 			-- Display feedback for rejected roll (e.g. cooldown or inventory full)

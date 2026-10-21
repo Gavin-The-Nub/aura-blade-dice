@@ -21,9 +21,12 @@ local EVENTS: { string } = {
 	"RollResult", -- server -> client: (success: boolean, swordData: any, isAuto: boolean, message: string?)
 	"ToggleAutoRoll", -- client -> server: ()
 	"AutoRollStateChanged", -- server -> client: (isEnabled: boolean)
+	"SetAutoSellRule", -- client -> server: (rarity: string, enabled: boolean)
 }
 local FUNCTIONS: { string } = {
 	"GetInitialData", -- client -> server: () -> DataTemplate.PlayerData?
+	"EquipSword", -- client -> server: (uid: string) -> (boolean, string?)
+	"SellSword", -- client -> server: (uid: string) -> (boolean, string?)
 }
 
 local Remotes = {}

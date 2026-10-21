@@ -30,6 +30,7 @@ export type ButtonComponent = {
 	Instance: TextButton,
 	SetText: (self: ButtonComponent, text: string) -> (),
 	SetEnabled: (self: ButtonComponent, enabled: boolean) -> (),
+	SetBorderColor: (self: ButtonComponent, color: Color3) -> (),
 	Destroy: (self: ButtonComponent) -> (),
 }
 
@@ -192,6 +193,12 @@ function Button.new(config: ButtonConfig): ButtonComponent
 			stroke.Color = enabled and baseBorder or Theme.Colors.BorderSubtle
 			label.TextColor3 = enabled and (config.TextColor or Theme.Colors.TextPrimary) or Theme.Colors.TextMuted
 			button.BackgroundColor3 = enabled and baseBg or Theme.Colors.BackgroundDark
+		end,
+		SetBorderColor = function(_, color: Color3)
+			baseBorder = color
+			if isEnabled then
+				stroke.Color = color
+			end
 		end,
 		Destroy = function(_)
 			button:Destroy()

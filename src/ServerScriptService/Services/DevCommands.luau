@@ -99,6 +99,17 @@ local function onRollTestCommand(originTextSource: TextSource, unfilteredText: s
 	say(player, ("[RollTest] Ran %d rolls (Luck: %.1fx). Rarity distribution printed to Output!"):format(sim.Count, sim.TotalLuck))
 end
 
+local function onClearSwordsCommand(originTextSource: TextSource, _unfilteredText: string)
+	local player = Players:GetPlayerByUserId(originTextSource.UserId)
+	if player == nil then
+		return
+	end
+
+	DataService.Set(player, "OwnedSwords", {})
+	DataService.Set(player, "EquippedSword", "")
+	say(player, "Swords cleared and unequipped!")
+end
+
 function DevCommands.Start()
 	if not RunService:IsStudio() then
 		return
@@ -121,6 +132,12 @@ function DevCommands.Start()
 	rollTestCommand.PrimaryAlias = "/rolltest"
 	rollTestCommand.Triggered:Connect(onRollTestCommand)
 	rollTestCommand.Parent = TextChatService
+
+	local clearSwordsCommand = Instance.new("TextChatCommand")
+	clearSwordsCommand.Name = "DevClearSwordsCommand"
+	clearSwordsCommand.PrimaryAlias = "/clearswords"
+	clearSwordsCommand.Triggered:Connect(onClearSwordsCommand)
+	clearSwordsCommand.Parent = TextChatService
 end
 
 return DevCommands

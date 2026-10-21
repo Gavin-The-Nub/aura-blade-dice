@@ -26,8 +26,9 @@ export type MainHUDInstance = {
 	SetOnAutoTapToggle: (self: MainHUDInstance, callback: () -> ()) -> (),
 	SetOnRoll: (self: MainHUDInstance, callback: () -> ()) -> (),
 	SetOnAutoRollToggle: (self: MainHUDInstance, callback: () -> ()) -> (),
-	ShowRollPopup: (self: MainHUDInstance, swordDef: any) -> (),
-	ShowRollToast: (self: MainHUDInstance, swordOrText: any, isError: boolean?) -> (),
+	SetOnBackpack: (self: MainHUDInstance, callback: () -> ()) -> (),
+	ShowRollPopup: (self: MainHUDInstance, swordDef: any, isAutoSold: boolean?) -> (),
+	ShowRollToast: (self: MainHUDInstance, swordOrText: any, isError: boolean?, isAutoSold: boolean?) -> (),
 	SpawnFloatingNumber: (self: MainHUDInstance, pos: Vector2, amount: number, isCrit: boolean) -> (),
 	Destroy: (self: MainHUDInstance) -> (),
 }
@@ -419,9 +420,13 @@ function MainHUD.new(parentGui: Instance): MainHUDInstance
 		end,
 	})
 
-	local function showRollPopup(swordDef: any)
+	local function showRollPopup(swordDef: any, isAutoSold: boolean?)
 		local rarityColor = (Swords.RarityColors and Swords.RarityColors[swordDef.rarity]) or Theme.Colors.AuraCyan
-		rollPopupRarityLabel.Text = ("%s (1 in %s)"):format(string.upper(swordDef.rarity), NumberFormat.format(swordDef.baseOdds))
+		local rarityText = ("%s (1 in %s)"):format(string.upper(swordDef.rarity), NumberFormat.format(swordDef.baseOdds))
+		if isAutoSold then
+			rarityText ..= " • AUTO-SOLD"
+		end
+		rollPopupRarityLabel.Text = rarityText
 		rollPopupRarityLabel.TextColor3 = rarityColor
 		rollPopupSwordLabel.Text = swordDef.name
 		rollPopupSwordLabel.TextColor3 = rarityColor
@@ -473,7 +478,7 @@ function MainHUD.new(parentGui: Instance): MainHUDInstance
 	toastLabel.Parent = toastFrame
 
 	local toastThread: thread? = nil
-	local function showRollToast(swordOrText: any, isError: boolean?)
+	local function showRollToast(swordOrText: any, isError: boolean?, isAutoSold: boolean?)
 		if toastThread then
 			task.cancel(toastThread)
 			toastThread = nil
@@ -487,7 +492,11 @@ function MainHUD.new(parentGui: Instance): MainHUDInstance
 			local rarityColor = (Swords.RarityColors and Swords.RarityColors[swordOrText.rarity]) or Theme.Colors.AuraCyan
 			toastStroke.Color = rarityColor
 			toastLabel.TextColor3 = rarityColor
-			toastLabel.Text = ("Rolled: [%s] (%s)"):format(swordOrText.name, swordOrText.rarity)
+			if isAutoSold then
+				toastLabel.Text = ("Auto-Sold: [%s] (%s)"):format(swordOrText.name, swordOrText.rarity)
+			else
+				toastLabel.Text = ("Rolled: [%s] (%s)"):format(swordOrText.name, swordOrText.rarity)
+			end
 		else
 			toastStroke.Color = Theme.Colors.Border
 			toastLabel.TextColor3 = Theme.Colors.TextPrimary
@@ -508,6 +517,8 @@ function MainHUD.new(parentGui: Instance): MainHUDInstance
 		end)
 	end
 
+	local onBackpackCallback: (() -> ())? = nil
+
 	createHudImageButton({
 		Name = "BackpackButton",
 		Text = "Swords",
@@ -520,7 +531,11 @@ function MainHUD.new(parentGui: Instance): MainHUDInstance
 		LayoutOrder = 1,
 		Parent = bottomContainer,
 		OnClick = function()
-			backpackPopup:Open()
+			if onBackpackCallback then
+				onBackpackCallback()
+			else
+				backpackPopup:Open()
+			end
 		end,
 	})
 
@@ -945,11 +960,14 @@ function MainHUD.new(parentGui: Instance): MainHUDInstance
 		SetOnAutoRollToggle = function(_, callback: () -> ())
 			onAutoRollToggleCallback = callback
 		end,
-		ShowRollPopup = function(_, swordDef: any)
-			showRollPopup(swordDef)
+		SetOnBackpack = function(_, callback: () -> ())
+			onBackpackCallback = callback
 		end,
-		ShowRollToast = function(_, swordOrText: any, isError: boolean?)
-			showRollToast(swordOrText, isError)
+		ShowRollPopup = function(_, swordDef: any, isAutoSold: boolean?)
+			showRollPopup(swordDef, isAutoSold)
+		end,
+		ShowRollToast = function(_, swordOrText: any, isError: boolean?, isAutoSold: boolean?)
+			showRollToast(swordOrText, isError, isAutoSold)
 		end,
 		SpawnFloatingNumber = function(_, pos: Vector2, amount: number, isCrit: boolean)
 			spawnFloatingDamageNumber(pos, amount, isCrit)

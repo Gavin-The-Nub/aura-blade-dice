@@ -108,7 +108,20 @@ function RollService.Roll(player: Player, isAuto: boolean): (boolean, Swords.Swo
 		return false, nil, ("Rolling on cooldown (%.1fs remaining)"):format(math.max(0, cooldown - timeSince))
 	end
 
-	-- Inventory capacity validation
+	-- Determine roll result
+	local totalLuck = RollService.GetTotalLuck(player)
+	local wonSword = RollService.PickSwordWithLuck(totalLuck)
+
+	-- Check Auto-Sell rule (Auto-sold swords don't count against inventory cap, simply removed)
+	local autoSellRules = DataService.Get(player, "AutoSellRules")
+	local isAutoSold = type(autoSellRules) == "table" and autoSellRules[wonSword.rarity] == true
+
+	if isAutoSold then
+		lastRollTime[player] = now
+		return true, wonSword, nil, true
+	end
+
+	-- Inventory capacity validation (only for swords kept in inventory)
 	local ownedSwords = DataService.Get(player, "OwnedSwords")
 	if type(ownedSwords) ~= "table" then
 		ownedSwords = {}
@@ -116,15 +129,11 @@ function RollService.Roll(player: Player, isAuto: boolean): (boolean, Swords.Swo
 
 	local maxCapacity = (GameConfig.Inventory and GameConfig.Inventory.MaxSwords) or 50
 	if #ownedSwords >= maxCapacity then
-		return false, nil, ("Inventory is full! (Max %d swords)"):format(maxCapacity)
+		return false, nil, ("Inventory is full! (Max %d swords)"):format(maxCapacity), false
 	end
 
 	-- Update cooldown timestamp
 	lastRollTime[player] = now
-
-	-- Determine roll result
-	local totalLuck = RollService.GetTotalLuck(player)
-	local wonSword = RollService.PickSwordWithLuck(totalLuck)
 
 	-- Add to player inventory {uid = <unique id>, id = <sword id>}
 	local newEntry = {
@@ -136,14 +145,17 @@ function RollService.Roll(player: Player, isAuto: boolean): (boolean, Swords.Swo
 	table.insert(updatedSwords, newEntry)
 	DataService.Set(player, "OwnedSwords", updatedSwords)
 
-	return true, wonSword, nil
+	return true, wonSword, nil, false
 end
 
 local function stopAutoRoll(player: Player)
 	autoRollActive[player] = false
-	if autoRollThreads[player] then
-		task.cancel(autoRollThreads[player])
+	local thread = autoRollThreads[player]
+	if thread then
 		autoRollThreads[player] = nil
+		if thread ~= coroutine.running() then
+			task.cancel(thread)
+		end
 	end
 	if player.Parent == Players then
 		Remotes.getEvent("AutoRollStateChanged"):FireClient(player, false)
@@ -164,12 +176,12 @@ local function startAutoRoll(player: Player)
 				break
 			end
 
-			local success, wonSword, err = RollService.Roll(player, true)
+			local success, wonSword, err, isAutoSold = RollService.Roll(player, true)
 			if success and wonSword then
-				Remotes.getEvent("RollResult"):FireClient(player, true, wonSword, true, nil)
+				Remotes.getEvent("RollResult"):FireClient(player, true, wonSword, true, nil, isAutoSold)
 			else
 				-- If inventory is full or data unloaded, notify and halt auto roll
-				Remotes.getEvent("RollResult"):FireClient(player, false, nil, true, err)
+				Remotes.getEvent("RollResult"):FireClient(player, false, nil, true, err, false)
 				stopAutoRoll(player)
 				break
 			end
@@ -257,11 +269,11 @@ function RollService.Start()
 	local rollResultEvent = Remotes.getEvent("RollResult")
 
 	rollEvent.OnServerEvent:Connect(function(player: Player)
-		local success, wonSword, err = RollService.Roll(player, false)
+		local success, wonSword, err, isAutoSold = RollService.Roll(player, false)
 		if success and wonSword then
-			rollResultEvent:FireClient(player, true, wonSword, false, nil)
+			rollResultEvent:FireClient(player, true, wonSword, false, nil, isAutoSold)
 		else
-			rollResultEvent:FireClient(player, false, nil, false, err)
+			rollResultEvent:FireClient(player, false, nil, false, err, false)
 		end
 	end)
 

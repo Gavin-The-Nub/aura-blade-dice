@@ -3,6 +3,7 @@
 
 local Game = {
 	Tap = {
+		UnarmedDamage = 1, -- Base damage when no sword is equipped
 		MaxTapsPerSecond = 10,
 		BurstAllowanceMultiplier = 2, -- token bucket capacity = MaxTapsPerSecond * BurstAllowanceMultiplier
 		CritChance = 0.10,

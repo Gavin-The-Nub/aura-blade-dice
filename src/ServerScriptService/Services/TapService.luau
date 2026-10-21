@@ -28,6 +28,7 @@ local playerFever: { [Player]: FeverState } = {}
 local feverThreads: { [Player]: thread } = {}
 local autoTapActive: { [Player]: boolean } = {}
 local autoTapThreads: { [Player]: thread } = {}
+local playerEquippedDamage: { [Player]: number } = {}
 
 local TapService = {}
 
@@ -35,6 +36,53 @@ local TapService = {}
 local swordMap: { [string]: Swords.SwordDef } = {}
 for _, def in Swords do
 	swordMap[def.id] = def
+end
+
+local function updateEquippedDamageCache(player: Player)
+	if not DataService.IsLoaded(player) then
+		playerEquippedDamage[player] = GameConfig.Tap.UnarmedDamage
+		return
+	end
+
+	local equippedUid = DataService.Get(player, "EquippedSword")
+	if type(equippedUid) ~= "string" or equippedUid == "" then
+		playerEquippedDamage[player] = GameConfig.Tap.UnarmedDamage
+		return
+	end
+
+	local ownedSwords = DataService.Get(player, "OwnedSwords")
+	local foundEntry = nil
+	if type(ownedSwords) == "table" then
+		for _, entry in ownedSwords do
+			if type(entry) == "table" and entry.uid == equippedUid then
+				foundEntry = entry
+				break
+			end
+		end
+	end
+
+	if foundEntry and type(foundEntry.id) == "string" then
+		local swordDef = swordMap[foundEntry.id]
+		if swordDef then
+			playerEquippedDamage[player] = swordDef.baseDamage
+			return
+		end
+	end
+
+	playerEquippedDamage[player] = GameConfig.Tap.UnarmedDamage
+end
+
+function TapService.GetEquippedDamage(player: Player): number
+	local damage = playerEquippedDamage[player]
+	if damage == nil then
+		updateEquippedDamageCache(player)
+		damage = playerEquippedDamage[player] or GameConfig.Tap.UnarmedDamage
+	end
+	return damage
+end
+
+function TapService.RefreshEquippedDamage(player: Player)
+	updateEquippedDamageCache(player)
 end
 
 local function getFeverState(player: Player): FeverState
@@ -177,15 +225,11 @@ end
 
 -- Calculates gold per tap: Base Damage × Grade × Enchant × Rebirth × Crit
 local function calculateTapEarnings(player: Player): (number, boolean)
-	local equippedId = DataService.Get(player, "EquippedSword")
-
-	-- Fallback to test_sword if no sword equipped (NOTE: To be removed during equip step)
-	if type(equippedId) ~= "string" or equippedId == "" then
-		equippedId = "test_sword"
+	local baseDamage = playerEquippedDamage[player]
+	if baseDamage == nil then
+		updateEquippedDamageCache(player)
+		baseDamage = playerEquippedDamage[player] or GameConfig.Tap.UnarmedDamage
 	end
-
-	local sword = swordMap[equippedId]
-	local baseDamage = if sword then sword.baseDamage else 1
 
 	-- Multipliers (placeholders for future systems: Grade, Enchant, Rebirth)
 	local gradeMult = 1
@@ -310,10 +354,17 @@ function TapService.Start()
 	local function initPlayer(player: Player)
 		task.spawn(function()
 			if DataService.WaitForProfile(player) then
+				updateEquippedDamageCache(player)
 				sendFeverUpdate(player)
 			end
 		end)
 	end
+
+	DataService.Changed:Connect(function(player: Player, key: string, _value: any)
+		if key == "EquippedSword" or key == "OwnedSwords" then
+			updateEquippedDamageCache(player)
+		end
+	end)
 
 	Players.PlayerAdded:Connect(initPlayer)
 	for _, player in Players:GetPlayers() do
@@ -322,6 +373,7 @@ function TapService.Start()
 
 	Players.PlayerRemoving:Connect(function(player)
 		playerBuckets[player] = nil
+		playerEquippedDamage[player] = nil
 
 		-- Clean up Auto-Tap
 		autoTapActive[player] = nil

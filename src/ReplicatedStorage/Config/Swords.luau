@@ -102,20 +102,26 @@ local Swords: { SwordDef } = {
 		baseOdds = 8500000,
 		baseDamage = 115000,
 	},
-
-	-- TEMP: temporary test sword for TapService validation. Kept until equip feature step.
-	{
-		id = "test_sword",
-		name = "Test Sword",
-		rarity = "Common",
-		baseOdds = 1,
-		baseDamage = 1,
-		isTest = true,
-	},
 }
+
+local Rarities: { string } = {
+	"Common",
+	"Uncommon",
+	"Rare",
+	"Epic",
+	"Legendary",
+	"Mythic",
+	"Secret",
+}
+
+local function isValidRarity(rarity: string): boolean
+	return table.find(Rarities, rarity) ~= nil
+end
 
 local module = setmetatable({
 	RarityColors = RarityColors,
+	Rarities = Rarities,
+	IsValidRarity = isValidRarity,
 }, {
 	__iter = function()
 		return ipairs(Swords)
@@ -128,4 +134,8 @@ local module = setmetatable({
 	end,
 })
 
-return module :: { SwordDef } & { RarityColors: { [string]: Color3 } }
+return module :: { SwordDef } & {
+	RarityColors: { [string]: Color3 },
+	Rarities: { string },
+	IsValidRarity: (rarity: string) -> boolean,
+}

@@ -9,9 +9,10 @@ export type PlayerData = {
 	Gems: number,
 	Rebirths: number,
 	OwnedSwords: { any }, -- sword entries are defined by a later feature
-	EquippedSword: string, -- "" means nothing equipped (nil can't be stored in a template)
+	EquippedSword: string, -- uid of equipped sword, or "" for nothing equipped
 	DiceTier: number, -- highest unlocked Dice tier, 1 = Basic Dice
 	LastLogout: number, -- unix seconds, used later for offline Gold
+	AutoSellRules: { [string]: boolean }, -- rarity -> boolean
 }
 
 local DataTemplate: PlayerData = {
@@ -23,6 +24,15 @@ local DataTemplate: PlayerData = {
 	EquippedSword = "",
 	DiceTier = 1,
 	LastLogout = 0,
+	AutoSellRules = {
+		Common = false,
+		Uncommon = false,
+		Rare = false,
+		Epic = false,
+		Legendary = false,
+		Mythic = false,
+		Secret = false,
+	},
 }
 
 return DataTemplate
