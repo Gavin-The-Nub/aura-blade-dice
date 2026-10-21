@@ -31,6 +31,55 @@ local Dice: { DiceDef } = {
 		baseLuck = 10,
 		rollCooldown = 2.9,
 	},
+	{
+		tier = 4,
+		name = "Verdant Dice",
+		cost = 75000,
+		baseLuck = 20,
+		rollCooldown = 2.8,
+	},
+	{
+		tier = 5,
+		name = "Volt Dice",
+		cost = 500000,
+		baseLuck = 42,
+		rollCooldown = 2.8,
+	},
+	{
+		tier = 6,
+		name = "Glacier Dice",
+		cost = 4000000,
+		baseLuck = 100,
+		rollCooldown = 2.7,
+	},
+	{
+		tier = 7,
+		name = "Magma Dice",
+		cost = 30000000,
+		baseLuck = 200,
+		rollCooldown = 2.7,
+	},
+	{
+		tier = 8,
+		name = "Gale Dice",
+		cost = 200000000,
+		baseLuck = 450,
+		rollCooldown = 2.6,
+	},
+	{
+		tier = 9,
+		name = "Sandstorm Dice",
+		cost = 1500000000,
+		baseLuck = 1000,
+		rollCooldown = 2.6,
+	},
+	{
+		tier = 10,
+		name = "Phantom Dice",
+		cost = 12000000000,
+		baseLuck = 2250,
+		rollCooldown = 2.5,
+	},
 }
 
 return Dice

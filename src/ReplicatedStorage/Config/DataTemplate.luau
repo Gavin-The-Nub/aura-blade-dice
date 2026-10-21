@@ -10,7 +10,8 @@ export type PlayerData = {
 	Rebirths: number,
 	OwnedSwords: { any }, -- sword entries are defined by a later feature
 	EquippedSword: string, -- uid of equipped sword, or "" for nothing equipped
-	DiceTier: number, -- highest unlocked Dice tier, 1 = Basic Dice
+	DiceTier: number, -- equipped Dice tier, 1 = Basic Dice
+	OwnedDice: { [string]: boolean }, -- set of owned tiers ("1", "2", ...)
 	LastLogout: number, -- unix seconds, used later for offline Gold
 	AutoSellRules: { [string]: boolean }, -- rarity -> boolean
 }
@@ -23,6 +24,9 @@ local DataTemplate: PlayerData = {
 	OwnedSwords = {},
 	EquippedSword = "",
 	DiceTier = 1,
+	OwnedDice = {
+		["1"] = true,
+	},
 	LastLogout = 0,
 	AutoSellRules = {
 		Common = false,

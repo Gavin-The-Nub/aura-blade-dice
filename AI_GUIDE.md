@@ -65,6 +65,7 @@ If you want to change this structure, ask me first.
 - **Crit:** 10% base chance, 2.5× Gold.
 - **Fever:** each tap adds 1 point to a 100-point meter. At 100 it triggers a 15-second mode with 2× swing speed, 100% crit, and +50% Luck.
 - **Pedestal passive income:** each pedestal Sword gives 50% of its Gold-per-tap value every second, including offline time.
+- **Dice Progression & Rebirth:** Players can purchase any Dice tier with Gold out of order and switch/equip any owned Dice tier. Upon Rebirth, all unlocked/owned Dice reset back to Tier 1 Basic Dice (`OwnedDice = { ["1"] = true }`, `DiceTier = 1`), and current Gold balance resets.
 
 When the GDD has a table, copy it into the matching Config module faithfully.
 

@@ -35,7 +35,7 @@ $$\text{Gold Per Tap} = \text{Sword Base Damage} \times \text{Grade Multiplier} 
 
 ## 3. The 25-Tier Sword Dice Progression Ladder
 
-Players spend Gold at the Dice Merchant to unlock and equip better Dice. Each tier roughly doubles to triples the player's base Luck while increasing in Gold cost by $4\times$ to $8\times$ per step.
+Players spend Gold at the Dice Merchant to purchase any Dice tier and equip any owned Dice. Tiers can be bought in any order without skipping constraints. Purchasing a Dice tier automatically equips it if it is higher than the currently equipped tier. Players can freely switch between any owned Dice at any time. Each tier roughly doubles to triples the player's base Luck while increasing in Gold cost by $4\times$ to $8\times$ per step.
 
 | Tier | Dice Name | Gold Cost | Base Luck | Roll Cooldown | Visual Theme |
 | :--- | :--- | :--- | :--- | :--- | :--- |
@@ -156,7 +156,7 @@ Each server houses 6 to 8 personal **Player Forge Plots** ringing the main plaza
 
 Once a player accumulates enough Gold, they can trigger a **Rebirth** to permanently accelerate their account progression.
 
-* **What Resets:** Current Gold balance and unlocked Dice Tiers reset to Tier 1 (*Basic Dice*).
+* **What Resets:** Current Gold balance, equipped Dice tier (`DiceTier` resets to 1 / *Basic Dice*), and all owned Dice tiers (`OwnedDice` resets back to only Tier 1 Basic Dice).
 * **What Stays:** All rolled **Swords** (including Grades, Enchants, and Blessings), **Gems**, **Enchant Rerolls**, **Potions**, and **Unlocked Pedestal Slots** are permanently kept.
 * **Rebirth Scaling Table (First 10 Rebirths):**
 

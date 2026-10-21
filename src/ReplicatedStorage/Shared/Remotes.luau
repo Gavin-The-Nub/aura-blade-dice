@@ -27,6 +27,8 @@ local FUNCTIONS: { string } = {
 	"GetInitialData", -- client -> server: () -> DataTemplate.PlayerData?
 	"EquipSword", -- client -> server: (uid: string) -> (boolean, string?)
 	"SellSword", -- client -> server: (uid: string) -> (boolean, string?)
+	"BuyDice", -- client -> server: (tier: number) -> (boolean, string?)
+	"EquipDice", -- client -> server: (tier: number) -> (boolean, string?)
 }
 
 local Remotes = {}

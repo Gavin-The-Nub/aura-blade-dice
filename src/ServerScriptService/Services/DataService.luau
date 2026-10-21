@@ -103,6 +103,23 @@ local function onPlayerAdded(player: Player)
 
 	profile:Reconcile() -- add any template fields this old profile is missing
 
+	-- Migrate OwnedDice: ensure set exists and marks tiers 1..DiceTier as owned
+	if type(profile.Data.OwnedDice) ~= "table" then
+		local copy = {}
+		local equipped = profile.Data.DiceTier or 1
+		for t = 1, equipped do
+			copy[tostring(t)] = true
+		end
+		copy["1"] = true
+		profile.Data.OwnedDice = copy
+	else
+		local equipped = profile.Data.DiceTier or 1
+		for t = 1, equipped do
+			profile.Data.OwnedDice[tostring(t)] = true
+		end
+		profile.Data.OwnedDice["1"] = true
+	end
+
 	-- Ensure AutoSellRules has all rarity keys even if loaded from an older profile shape
 	if type(profile.Data.AutoSellRules) ~= "table" then
 		local copy = {}

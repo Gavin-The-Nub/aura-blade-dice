@@ -27,6 +27,7 @@ export type MainHUDInstance = {
 	SetOnRoll: (self: MainHUDInstance, callback: () -> ()) -> (),
 	SetOnAutoRollToggle: (self: MainHUDInstance, callback: () -> ()) -> (),
 	SetOnBackpack: (self: MainHUDInstance, callback: () -> ()) -> (),
+	SetOnDice: (self: MainHUDInstance, callback: () -> ()) -> (),
 	ShowRollPopup: (self: MainHUDInstance, swordDef: any, isAutoSold: boolean?) -> (),
 	ShowRollToast: (self: MainHUDInstance, swordOrText: any, isError: boolean?, isAutoSold: boolean?) -> (),
 	SpawnFloatingNumber: (self: MainHUDInstance, pos: Vector2, amount: number, isCrit: boolean) -> (),
@@ -269,10 +270,10 @@ function MainHUD.new(parentGui: Instance): MainHUDInstance
 	local rebirthPopup = createPlaceholderPopup("Rebirth Chamber", "Rebirth system unlocks permanent Gold & Luck multipliers.")
 	local indexPopup = createPlaceholderPopup("Blade Codex", "View all discovered Swords, Grades, and Auras in your collection.")
 
-	-- 3. Side Menu: Left vertical stack in exact order: Shop (1), Rebirth (2), Index (3)
+	-- 3. Side Menu: Left vertical stack: Shop (1), Dice (2), Rebirth (3), Index (4)
 	local sideContainer = Instance.new("Frame")
 	sideContainer.Name = "SideMenu"
-	sideContainer.Size = UDim2.new(0, 68, 0, 220)
+	sideContainer.Size = UDim2.new(0, 68, 0, 280)
 	sideContainer.Position = UDim2.new(0, 16, 0.45, 0)
 	sideContainer.AnchorPoint = Vector2.new(0, 0.5)
 	sideContainer.BackgroundTransparency = 1
@@ -303,6 +304,26 @@ function MainHUD.new(parentGui: Instance): MainHUDInstance
 		end,
 	})
 
+	local onDiceCallback: (() -> ())? = nil
+
+	createHudImageButton({
+		Name = "DiceButton",
+		Text = "Dice",
+		AssetKey = "Dice",
+		FallbackIcon = "🎲",
+		FallbackBgColor = Theme.Colors.ButtonSecondary,
+		BorderColor = Theme.Colors.AuraGold,
+		Size = UDim2.new(0, 60, 0, 60),
+		CornerRadius = Theme.Corner.Medium,
+		LayoutOrder = 2,
+		Parent = sideContainer,
+		OnClick = function()
+			if onDiceCallback then
+				onDiceCallback()
+			end
+		end,
+	})
+
 	createHudImageButton({
 		Name = "RebirthButton",
 		Text = "Rebirth",
@@ -312,7 +333,7 @@ function MainHUD.new(parentGui: Instance): MainHUDInstance
 		BorderColor = Theme.Colors.AuraPurple,
 		Size = UDim2.new(0, 60, 0, 60),
 		CornerRadius = Theme.Corner.Medium,
-		LayoutOrder = 2,
+		LayoutOrder = 3,
 		Parent = sideContainer,
 		OnClick = function()
 			rebirthPopup:Open()
@@ -328,7 +349,7 @@ function MainHUD.new(parentGui: Instance): MainHUDInstance
 		BorderColor = Theme.Colors.AuraCyan,
 		Size = UDim2.new(0, 60, 0, 60),
 		CornerRadius = Theme.Corner.Medium,
-		LayoutOrder = 3,
+		LayoutOrder = 4,
 		Parent = sideContainer,
 		OnClick = function()
 			indexPopup:Open()
@@ -962,6 +983,9 @@ function MainHUD.new(parentGui: Instance): MainHUDInstance
 		end,
 		SetOnBackpack = function(_, callback: () -> ())
 			onBackpackCallback = callback
+		end,
+		SetOnDice = function(_, callback: () -> ())
+			onDiceCallback = callback
 		end,
 		ShowRollPopup = function(_, swordDef: any, isAutoSold: boolean?)
 			showRollPopup(swordDef, isAutoSold)

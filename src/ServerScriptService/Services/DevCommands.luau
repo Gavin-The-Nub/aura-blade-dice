@@ -14,6 +14,7 @@ local TextChatService = game:GetService("TextChatService")
 local DataService = require(ServerScriptService.Services.DataService)
 local TapService = require(ServerScriptService.Services.TapService)
 local RollService = require(ServerScriptService.Services.RollService)
+local Dice = require(ReplicatedStorage.Config.Dice)
 local NumberFormat = require(ReplicatedStorage.Shared.NumberFormat)
 local Remotes = require(ReplicatedStorage.Shared.Remotes)
 
@@ -110,6 +111,58 @@ local function onClearSwordsCommand(originTextSource: TextSource, _unfilteredTex
 	say(player, "Swords cleared and unequipped!")
 end
 
+local function onDiceCommand(originTextSource: TextSource, unfilteredText: string)
+	local player = Players:GetPlayerByUserId(originTextSource.UserId)
+	if player == nil then
+		return
+	end
+
+	local arg = unfilteredText:match("^%S+%s+(%S+)")
+	local tier = tonumber(arg)
+	if arg == nil or tier == nil or tier ~= math.floor(tier) or tier < 1 then
+		say(player, "Usage: /dice <tierNumber>  (e.g. /dice 4)")
+		return
+	end
+
+	local diceMap: { [number]: Dice.DiceDef } = {}
+	for _, def in Dice do
+		diceMap[def.tier] = def
+	end
+
+	local targetDef = diceMap[tier]
+	if not targetDef then
+		say(player, ("Dice tier %d does not exist in Config (Available: 1 to %d)"):format(tier, #Dice))
+		return
+	end
+
+	local updatedOwned: { [string]: boolean } = {}
+	for t = 1, tier do
+		updatedOwned[tostring(t)] = true
+	end
+	DataService.Set(player, "OwnedDice", updatedOwned)
+	local ok = DataService.Set(player, "DiceTier", tier)
+	if ok then
+		say(player, ("Dice set to Tier %d (%s | Luck: %sx | CD: %.1fs). Tiers 1..%d marked owned."):format(tier, targetDef.name, tostring(targetDef.baseLuck), targetDef.rollCooldown, tier))
+	else
+		say(player, "/dice rejected (data not loaded yet, or invalid value)")
+	end
+end
+
+local function onResetDiceCommand(originTextSource: TextSource, _unfilteredText: string)
+	local player = Players:GetPlayerByUserId(originTextSource.UserId)
+	if player == nil then
+		return
+	end
+
+	DataService.Set(player, "OwnedDice", { ["1"] = true })
+	local ok = DataService.Set(player, "DiceTier", 1)
+	if ok then
+		say(player, "Dice reset: only Tier 1 (Basic Dice) is owned and equipped.")
+	else
+		say(player, "/resetdice rejected (data not loaded yet)")
+	end
+end
+
 function DevCommands.Start()
 	if not RunService:IsStudio() then
 		return
@@ -138,6 +191,18 @@ function DevCommands.Start()
 	clearSwordsCommand.PrimaryAlias = "/clearswords"
 	clearSwordsCommand.Triggered:Connect(onClearSwordsCommand)
 	clearSwordsCommand.Parent = TextChatService
+
+	local diceCommand = Instance.new("TextChatCommand")
+	diceCommand.Name = "DevDiceCommand"
+	diceCommand.PrimaryAlias = "/dice"
+	diceCommand.Triggered:Connect(onDiceCommand)
+	diceCommand.Parent = TextChatService
+
+	local resetDiceCommand = Instance.new("TextChatCommand")
+	resetDiceCommand.Name = "DevResetDiceCommand"
+	resetDiceCommand.PrimaryAlias = "/resetdice"
+	resetDiceCommand.Triggered:Connect(onResetDiceCommand)
+	resetDiceCommand.Parent = TextChatService
 end
 
 return DevCommands
