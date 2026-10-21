@@ -41,7 +41,8 @@ Out (do NOT build): Relic Accessories (removed), splash damage (removed, there i
 ```
 ReplicatedStorage/
   Config/        -- Dice, Swords, Grades, Enchants, Blessings, Rebirths, Trials, Events
-  Shared/        -- NumberFormat, WeightedRandom, small shared helpers
+  Shared/        -- NumberFormat, Theme, WeightedRandom, small shared helpers
+    UI/          -- Reusable UI components (Button, Panel, Popup) and Screen layouts (HUD)
   Remotes/       -- RemoteEvents and RemoteFunctions
 ServerScriptService/
   Services/      -- DataService, TapService, RollService, PlotService, RebirthService, TrialService, EventService
@@ -52,6 +53,7 @@ StarterPlayer/
 StarterGui/      -- ScreenGuis
 ```
 
+**Script Sync Rule:** Only create folders inside folders that are already synced (`Config`, `Shared`, `Services`, `Controllers`). If you ever need a new top-level folder, ask the user first so they can link it with Script Sync.
 If you want to change this structure, ask me first.
 
 ## 6. Game math (from the GDD, implement exactly)

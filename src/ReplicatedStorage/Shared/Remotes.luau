@@ -11,8 +11,11 @@ local FOLDER_NAME = "Remotes"
 -- Names only. Payload shapes are validated by the server handler that owns each remote.
 local EVENTS: { string } = {
 	"DevMessage", -- server -> client text for Studio-only dev commands (DevCommands)
+	"DataChanged", -- server -> client: (key: string, value: any)
 }
-local FUNCTIONS: { string } = {}
+local FUNCTIONS: { string } = {
+	"GetInitialData", -- client -> server: () -> DataTemplate.PlayerData?
+}
 
 local Remotes = {}
 

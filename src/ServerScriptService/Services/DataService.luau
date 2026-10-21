@@ -13,6 +13,7 @@ local RunService = game:GetService("RunService")
 local ServerScriptService = game:GetService("ServerScriptService")
 
 local DataTemplate = require(ReplicatedStorage.Config.DataTemplate)
+local Remotes = require(ReplicatedStorage.Shared.Remotes)
 local ProfileStore = require(ServerScriptService.Vendor.ProfileStore) :: any
 
 local STORE_NAME = "PlayerData_v1"
@@ -123,6 +124,14 @@ end
 
 -- Start once from Main. Handles players already in the server as well as new joins.
 function DataService.Start()
+	local getInitialDataFunc = Remotes.getFunction("GetInitialData")
+	getInitialDataFunc.OnServerInvoke = function(player: Player)
+		if not DataService.WaitForProfile(player) then
+			return nil
+		end
+		return DataService.GetAll(player)
+	end
+
 	Players.PlayerAdded:Connect(onPlayerAdded)
 	Players.PlayerRemoving:Connect(onPlayerRemoving)
 	for _, player in Players:GetPlayers() do
@@ -208,6 +217,16 @@ function DataService.Set(player: Player, key: string, value: any): boolean
 	end
 	profile.Data[key] = value
 	changedEvent:Fire(player, key, value)
+	if player.Parent == Players then
+		task.spawn(function()
+			local ok, event = pcall(function()
+				return Remotes.getEvent("DataChanged")
+			end)
+			if ok and event then
+				event:FireClient(player, key, value)
+			end
+		end)
+	end
 	return true
 end
 
