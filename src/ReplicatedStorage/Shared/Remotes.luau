@@ -9,7 +9,9 @@ local RunService = game:GetService("RunService")
 local FOLDER_NAME = "Remotes"
 
 -- Names only. Payload shapes are validated by the server handler that owns each remote.
-local EVENTS: { string } = {}
+local EVENTS: { string } = {
+	"DevMessage", -- server -> client text for Studio-only dev commands (DevCommands)
+}
 local FUNCTIONS: { string } = {}
 
 local Remotes = {}
