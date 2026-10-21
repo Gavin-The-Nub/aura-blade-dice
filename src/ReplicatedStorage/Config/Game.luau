@@ -8,6 +8,17 @@ local Game = {
 		CritChance = 0.10,
 		CritMultiplier = 2.5,
 	},
+	Fever = {
+		MaxPoints = 100,
+		ChargePerTap = 1,
+		Duration = 15, -- seconds of Fever Mode
+		SpeedMultiplier = 2, -- 2x swing speed / tap rate limit
+		CritChance = 1.0, -- 100% crit chance during Fever Mode
+		LuckMultiplier = 1.5, -- +50% Total Luck
+	},
+	AutoTap = {
+		BaseTapsPerSecond = 10, -- Base auto-tap rate (matches MaxTapsPerSecond)
+	},
 }
 
 return Game

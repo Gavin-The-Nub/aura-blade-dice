@@ -14,6 +14,9 @@ local EVENTS: { string } = {
 	"DataChanged", -- server -> client: (key: string, value: any)
 	"Tap", -- client -> server: ()
 	"TapResult", -- server -> client: (goldEarned: number, isCrit: boolean)
+	"ToggleAutoTap", -- client -> server: ()
+	"AutoTapStateChanged", -- server -> client: (isEnabled: boolean)
+	"FeverUpdated", -- server -> client: (points: number, maxPoints: number, isActive: boolean, durationRemaining: number)
 }
 local FUNCTIONS: { string } = {
 	"GetInitialData", -- client -> server: () -> DataTemplate.PlayerData?

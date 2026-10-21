@@ -22,6 +22,9 @@ local lastTapPos: Vector2? = nil
 function TapController.Init(hud: MainHUDInstance)
 	tapEvent = Remotes.getEvent("Tap")
 	tapResultEvent = Remotes.getEvent("TapResult")
+	local toggleAutoTapEvent = Remotes.getEvent("ToggleAutoTap")
+	local autoTapStateEvent = Remotes.getEvent("AutoTapStateChanged")
+	local feverUpdatedEvent = Remotes.getEvent("FeverUpdated")
 
 	-- Wire tap input from the HUD tap area
 	hud:SetOnTap(function(pos: Vector2)
@@ -30,6 +33,33 @@ function TapController.Init(hud: MainHUDInstance)
 			tapEvent:FireServer()
 		end
 	end)
+
+	-- Wire Auto-Tap toggle button
+	hud:SetOnAutoTapToggle(function()
+		if toggleAutoTapEvent then
+			toggleAutoTapEvent:FireServer()
+		end
+	end)
+
+	-- Listen for Auto-Tap state updates from server
+	if autoTapStateEvent then
+		autoTapStateEvent.OnClientEvent:Connect(function(isEnabled: unknown)
+			if type(isEnabled) == "boolean" then
+				hud:SetAutoTapState(isEnabled)
+			end
+		end)
+	end
+
+	-- Listen for Fever meter & mode updates from server
+	if feverUpdatedEvent then
+		feverUpdatedEvent.OnClientEvent:Connect(function(points: unknown, maxPoints: unknown, isActive: unknown, durationRemaining: unknown)
+			local pts = if type(points) == "number" then points else 0
+			local maxPts = if type(maxPoints) == "number" then maxPoints else 100
+			local active = if type(isActive) == "boolean" then isActive else false
+			local duration = if type(durationRemaining) == "number" then durationRemaining else 0
+			hud:UpdateFever(pts, maxPts, active, duration)
+		end)
+	end
 
 	-- Listen for verified tap results from the server
 	if tapResultEvent then

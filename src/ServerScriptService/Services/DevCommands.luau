@@ -12,6 +12,7 @@ local ServerScriptService = game:GetService("ServerScriptService")
 local TextChatService = game:GetService("TextChatService")
 
 local DataService = require(ServerScriptService.Services.DataService)
+local TapService = require(ServerScriptService.Services.TapService)
 local NumberFormat = require(ReplicatedStorage.Shared.NumberFormat)
 local Remotes = require(ReplicatedStorage.Shared.Remotes)
 
@@ -52,16 +53,39 @@ local function onGoldCommand(originTextSource: TextSource, unfilteredText: strin
 	end
 end
 
+local function onFeverCommand(originTextSource: TextSource, unfilteredText: string)
+	local player = Players:GetPlayerByUserId(originTextSource.UserId)
+	if player == nil then
+		return
+	end
+
+	local arg = unfilteredText:match("^%S+%s+(%S+)")
+	local amount = tonumber(arg)
+	if amount == nil then
+		TapService.TriggerFever(player)
+		say(player, "Fever Mode triggered for 15s!")
+	else
+		TapService.SetFeverPoints(player, amount)
+		say(player, ("Fever points set to %d"):format(amount))
+	end
+end
+
 function DevCommands.Start()
 	if not RunService:IsStudio() then
 		return
 	end
 
-	local command = Instance.new("TextChatCommand")
-	command.Name = "DevGoldCommand"
-	command.PrimaryAlias = "/gold"
-	command.Triggered:Connect(onGoldCommand)
-	command.Parent = TextChatService
+	local goldCommand = Instance.new("TextChatCommand")
+	goldCommand.Name = "DevGoldCommand"
+	goldCommand.PrimaryAlias = "/gold"
+	goldCommand.Triggered:Connect(onGoldCommand)
+	goldCommand.Parent = TextChatService
+
+	local feverCommand = Instance.new("TextChatCommand")
+	feverCommand.Name = "DevFeverCommand"
+	feverCommand.PrimaryAlias = "/fever"
+	feverCommand.Triggered:Connect(onFeverCommand)
+	feverCommand.Parent = TextChatService
 end
 
 return DevCommands

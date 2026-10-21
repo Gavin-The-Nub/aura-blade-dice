@@ -17,7 +17,10 @@ local Popup = require(Components:WaitForChild("Popup"))
 export type MainHUDInstance = {
 	Gui: ScreenGui,
 	UpdateGold: (self: MainHUDInstance, amount: number) -> (),
+	UpdateFever: (self: MainHUDInstance, points: number, maxPoints: number, isActive: boolean, durationRemaining: number) -> (),
+	SetAutoTapState: (self: MainHUDInstance, isEnabled: boolean) -> (),
 	SetOnTap: (self: MainHUDInstance, callback: (Vector2) -> ()) -> (),
+	SetOnAutoTapToggle: (self: MainHUDInstance, callback: () -> ()) -> (),
 	SpawnFloatingNumber: (self: MainHUDInstance, pos: Vector2, amount: number, isCrit: boolean) -> (),
 	Destroy: (self: MainHUDInstance) -> (),
 }
@@ -399,6 +402,208 @@ function MainHUD.new(parentGui: Instance): MainHUDInstance
 		end,
 	})
 
+	-- 5. Fever Bar: Positioned directly above the Bottom Bar
+	local feverContainer = Instance.new("Frame")
+	feverContainer.Name = "FeverBarContainer"
+	feverContainer.Size = UDim2.new(0, 270, 0, 22)
+	feverContainer.Position = UDim2.new(0.5, 0, 1, -98)
+	feverContainer.AnchorPoint = Vector2.new(0.5, 1)
+	feverContainer.BackgroundColor3 = Theme.Colors.BackgroundDark
+	feverContainer.BackgroundTransparency = 0.15
+	feverContainer.ClipsDescendants = true
+	feverContainer.ZIndex = 5
+	feverContainer.Parent = root
+
+	local feverCorner = Instance.new("UICorner")
+	feverCorner.CornerRadius = Theme.Corner.Round
+	feverCorner.Parent = feverContainer
+
+	local feverStroke = Instance.new("UIStroke")
+	feverStroke.Color = Theme.Colors.Border
+	feverStroke.Thickness = Theme.Stroke.WidthThin
+	feverStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+	feverStroke.Parent = feverContainer
+
+	local feverFill = Instance.new("Frame")
+	feverFill.Name = "Fill"
+	feverFill.Size = UDim2.new(0, 0, 1, 0)
+	feverFill.Position = UDim2.new(0, 0, 0, 0)
+	feverFill.BackgroundColor3 = Theme.Colors.AuraCrimson
+	feverFill.BorderSizePixel = 0
+	feverFill.ZIndex = 6
+	feverFill.Parent = feverContainer
+
+	local feverFillCorner = Instance.new("UICorner")
+	feverFillCorner.CornerRadius = Theme.Corner.Round
+	feverFillCorner.Parent = feverFill
+
+	local feverFillGradient = Instance.new("UIGradient")
+	feverFillGradient.Color = ColorSequence.new({
+		ColorSequenceKeypoint.new(0, Theme.Colors.AuraCrimson),
+		ColorSequenceKeypoint.new(1, Theme.Colors.AuraGold),
+	})
+	feverFillGradient.Parent = feverFill
+
+	local feverLabel = Instance.new("TextLabel")
+	feverLabel.Name = "Label"
+	feverLabel.Size = UDim2.new(1, 0, 1, 0)
+	feverLabel.Position = UDim2.new(0.5, 0, 0.5, 0)
+	feverLabel.AnchorPoint = Vector2.new(0.5, 0.5)
+	feverLabel.BackgroundTransparency = 1
+	feverLabel.Text = "FEVER 0/100"
+	feverLabel.TextColor3 = Theme.Colors.TextPrimary
+	feverLabel.Font = Theme.Fonts.Button
+	feverLabel.TextSize = 11
+	feverLabel.ZIndex = 7
+	feverLabel.Parent = feverContainer
+
+	local feverLabelStroke = Instance.new("UIStroke")
+	feverLabelStroke.Color = Theme.TextStroke.Color
+	feverLabelStroke.Thickness = 1.5
+	feverLabelStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Contextual
+	feverLabelStroke.Parent = feverLabel
+
+	-- 6. Auto-Tap Toggle Button: Bottom-Right thumb zone (completely clear of ROLL)
+	local autoTapButton = Instance.new("ImageButton")
+	autoTapButton.Name = "AutoTapButton"
+	autoTapButton.Size = UDim2.new(0, 68, 0, 58)
+	autoTapButton.Position = UDim2.new(1, -20, 1, -20)
+	autoTapButton.AnchorPoint = Vector2.new(1, 1)
+	autoTapButton.BackgroundColor3 = Theme.Colors.ButtonSecondary
+	autoTapButton.AutoButtonColor = false
+	autoTapButton.ZIndex = 5
+	autoTapButton.Parent = root
+
+	local autoCorner = Instance.new("UICorner")
+	autoCorner.CornerRadius = Theme.Corner.Medium
+	autoCorner.Parent = autoTapButton
+
+	local autoStroke = Instance.new("UIStroke")
+	autoStroke.Color = Theme.Colors.Border
+	autoStroke.Thickness = Theme.Stroke.WidthDefault
+	autoStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+	autoStroke.Parent = autoTapButton
+
+	local autoScale = Instance.new("UIScale")
+	autoScale.Scale = 1
+	autoScale.Parent = autoTapButton
+
+	local autoIcon = Instance.new("TextLabel")
+	autoIcon.Name = "Icon"
+	autoIcon.Size = UDim2.new(1, 0, 0.45, 0)
+	autoIcon.Position = UDim2.new(0.5, 0, 0.08, 0)
+	autoIcon.AnchorPoint = Vector2.new(0.5, 0)
+	autoIcon.BackgroundTransparency = 1
+	autoIcon.Text = "⚡"
+	autoIcon.TextSize = 20
+	autoIcon.Font = Theme.Fonts.Title
+	autoIcon.ZIndex = 6
+	autoIcon.Parent = autoTapButton
+
+	local autoLabel = Instance.new("TextLabel")
+	autoLabel.Name = "Label"
+	autoLabel.Size = UDim2.new(1, -4, 0.4, 0)
+	autoLabel.Position = UDim2.new(0.5, 0, 0.95, 0)
+	autoLabel.AnchorPoint = Vector2.new(0.5, 1)
+	autoLabel.BackgroundTransparency = 1
+	autoLabel.Text = "AUTO: OFF"
+	autoLabel.TextColor3 = Theme.Colors.TextMuted
+	autoLabel.Font = Theme.Fonts.Button
+	autoLabel.TextSize = 10
+	autoLabel.ZIndex = 6
+	autoLabel.Parent = autoTapButton
+
+	local autoTextStroke = Instance.new("UIStroke")
+	autoTextStroke.Color = Theme.TextStroke.Color
+	autoTextStroke.Thickness = Theme.TextStroke.Thickness
+	autoTextStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Contextual
+	autoTextStroke.Parent = autoLabel
+
+	-- Micro-interactions for Auto-Tap button
+	autoTapButton.MouseEnter:Connect(function()
+		TweenService:Create(autoScale, Theme.Transitions.Fast, { Scale = 1.05 }):Play()
+	end)
+	autoTapButton.MouseLeave:Connect(function()
+		TweenService:Create(autoScale, Theme.Transitions.Fast, { Scale = 1.0 }):Play()
+	end)
+	autoTapButton.InputBegan:Connect(function(input)
+		if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+			TweenService:Create(autoScale, Theme.Transitions.Fast, { Scale = 0.93 }):Play()
+		end
+	end)
+	autoTapButton.InputEnded:Connect(function(input)
+		if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+			TweenService:Create(autoScale, Theme.Transitions.Fast, { Scale = 1.0 }):Play()
+		end
+	end)
+
+	local onAutoTapToggleCallback: (() -> ())? = nil
+	autoTapButton.Activated:Connect(function()
+		if onAutoTapToggleCallback then
+			onAutoTapToggleCallback()
+		end
+	end)
+
+	local function setAutoTapVisuals(isEnabled: boolean)
+		if isEnabled then
+			autoStroke.Color = Theme.Colors.AuraEmerald
+			autoStroke.Thickness = Theme.Stroke.WidthThick
+			autoTapButton.BackgroundColor3 = Color3.fromRGB(18, 48, 32)
+			autoLabel.Text = "AUTO: ON"
+			autoLabel.TextColor3 = Theme.Colors.AuraEmerald
+		else
+			autoStroke.Color = Theme.Colors.Border
+			autoStroke.Thickness = Theme.Stroke.WidthDefault
+			autoTapButton.BackgroundColor3 = Theme.Colors.ButtonSecondary
+			autoLabel.Text = "AUTO: OFF"
+			autoLabel.TextColor3 = Theme.Colors.TextMuted
+		end
+	end
+
+	local feverCountdownThread: thread? = nil
+	local isCurrentlyFever = false
+
+	local function updateFeverDisplay(points: number, maxPoints: number, isActive: boolean, durationRemaining: number)
+		if feverCountdownThread then
+			task.cancel(feverCountdownThread)
+			feverCountdownThread = nil
+		end
+
+		isCurrentlyFever = isActive
+
+		if isActive then
+			feverStroke.Color = Theme.Colors.AuraGold
+			feverStroke.Thickness = Theme.Stroke.WidthThick
+			feverFill.BackgroundColor3 = Theme.Colors.AuraGold
+
+			local totalDuration = if durationRemaining > 0 then durationRemaining else 15
+			local feverEndTime = os.clock() + durationRemaining
+
+			feverCountdownThread = task.spawn(function()
+				while isCurrentlyFever do
+					local remaining = math.max(0, feverEndTime - os.clock())
+					feverLabel.Text = string.format("🔥 FEVER %.1fs 🔥", remaining)
+					local fillPct = math.clamp(remaining / totalDuration, 0, 1)
+					feverFill.Size = UDim2.new(fillPct, 0, 1, 0)
+					if remaining <= 0 then
+						break
+					end
+					task.wait(0.05)
+				end
+			end)
+		else
+			feverStroke.Color = Theme.Colors.Border
+			feverStroke.Thickness = Theme.Stroke.WidthThin
+			feverFill.BackgroundColor3 = Theme.Colors.AuraCrimson
+
+			local pct = if maxPoints > 0 then math.clamp(points / maxPoints, 0, 1) else 0
+			TweenService:Create(feverFill, Theme.Transitions.Fast, {
+				Size = UDim2.new(pct, 0, 1, 0),
+			}):Play()
+			feverLabel.Text = string.format("FEVER %d/%d", points, maxPoints)
+		end
+	end
+
 	local activeDamageNumbers = 0
 	local MAX_ACTIVE_DAMAGE_NUMBERS = 20
 
@@ -411,7 +616,6 @@ function MainHUD.new(parentGui: Instance): MainHUDInstance
 		local label = Instance.new("TextLabel")
 		label.Name = "DamageNumber"
 		label.AnchorPoint = Vector2.new(0.5, 0.5)
-		-- Add slight random offset for readability when tapping repeatedly in the same spot
 		local offsetX = math.random(-20, 20)
 		local offsetY = math.random(-10, 10)
 		label.Position = UDim2.new(0, pos.X + offsetX, 0, pos.Y + offsetY)
@@ -440,7 +644,6 @@ function MainHUD.new(parentGui: Instance): MainHUDInstance
 
 		label.Parent = root
 
-		-- Floating up and fading out animation
 		local targetY = label.Position.Y.Offset - (if isCrit then 60 else 40)
 		local tweenInfo = TweenInfo.new(0.65, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
 		local tween = TweenService:Create(label, tweenInfo, {
@@ -465,13 +668,26 @@ function MainHUD.new(parentGui: Instance): MainHUDInstance
 		UpdateGold = function(_, amount: number)
 			goldLabel.Text = "$" .. NumberFormat.format(amount)
 		end,
+		UpdateFever = function(_, points: number, maxPoints: number, isActive: boolean, durationRemaining: number)
+			updateFeverDisplay(points, maxPoints, isActive, durationRemaining)
+		end,
+		SetAutoTapState = function(_, isEnabled: boolean)
+			setAutoTapVisuals(isEnabled)
+		end,
 		SetOnTap = function(_, callback: (Vector2) -> ())
 			onTapCallback = callback
+		end,
+		SetOnAutoTapToggle = function(_, callback: () -> ())
+			onAutoTapToggleCallback = callback
 		end,
 		SpawnFloatingNumber = function(_, pos: Vector2, amount: number, isCrit: boolean)
 			spawnFloatingDamageNumber(pos, amount, isCrit)
 		end,
 		Destroy = function(_)
+			if feverCountdownThread then
+				task.cancel(feverCountdownThread)
+				feverCountdownThread = nil
+			end
 			screenGui:Destroy()
 		end,
 	}
