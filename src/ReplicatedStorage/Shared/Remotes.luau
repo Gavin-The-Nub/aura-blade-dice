@@ -22,6 +22,7 @@ local EVENTS: { string } = {
 	"ToggleAutoRoll", -- client -> server: ()
 	"AutoRollStateChanged", -- server -> client: (isEnabled: boolean)
 	"SetAutoSellRule", -- client -> server: (rarity: string, enabled: boolean)
+	"PlotAssigned", -- server -> client: (plotId: number?, plotModel: Instance?)
 }
 local FUNCTIONS: { string } = {
 	"GetInitialData", -- client -> server: () -> DataTemplate.PlayerData?
@@ -29,6 +30,11 @@ local FUNCTIONS: { string } = {
 	"SellSword", -- client -> server: (uid: string) -> (boolean, string?)
 	"BuyDice", -- client -> server: (tier: number) -> (boolean, string?)
 	"EquipDice", -- client -> server: (tier: number) -> (boolean, string?)
+	"GetPlotData", -- client -> server: () -> { plotId: number?, placedSwords: { [string]: string }, pedestalSlots: number, offlineIncome: any? }?
+	"ClaimOfflineIncome", -- client -> server: () -> { gold: number, seconds: number }?
+	"PlaceSword", -- client -> server: (slotIndex: number, swordUid: string) -> (boolean, string?)
+	"RemoveSword", -- client -> server: (slotIndex: number) -> (boolean, string?)
+	"EquipBest", -- client -> server: () -> (boolean, string?)
 }
 
 local Remotes = {}

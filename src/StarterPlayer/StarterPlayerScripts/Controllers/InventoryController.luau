@@ -18,11 +18,12 @@ local InventoryController = {}
 local ownedSwords: { any } = {}
 local equippedSwordUid: string = ""
 local autoSellRules: { [string]: boolean } = {}
+local placedSwords: { [string]: string } = {}
 local uiInstance: InventoryUI.InventoryUIInstance? = nil
 
 local function refreshUI()
 	if uiInstance then
-		uiInstance:SetData(ownedSwords, equippedSwordUid, autoSellRules)
+		uiInstance:SetData(ownedSwords, equippedSwordUid, autoSellRules, placedSwords)
 	end
 end
 
@@ -94,6 +95,25 @@ function InventoryController.Init()
 		toggleEvent:FireServer(rarity, enabled)
 	end)
 
+	uiInstance:SetOnEquipBest(function()
+		task.spawn(function()
+			if not uiInstance then return end
+			uiInstance:SetEquipBestBusy(true)
+			local equipBestFunc = Remotes.getFunction("EquipBest")
+			local ok, success, msg = pcall(function()
+				return equipBestFunc:InvokeServer()
+			end)
+			if uiInstance then
+				uiInstance:SetEquipBestBusy(false)
+				if ok then
+					uiInstance:ShowEquipBestMessage(tostring(msg or (if success then "Equipped best swords!" else "Failed to equip")), success)
+				else
+					uiInstance:ShowEquipBestMessage("Request failed: " .. tostring(msg or "network error"), false)
+				end
+			end
+		end)
+	end)
+
 	-- Sync on DataChanged
 	local dataChangedRemote = Remotes.getEvent("DataChanged")
 	dataChangedRemote.OnClientEvent:Connect(function(key: unknown, value: unknown)
@@ -102,6 +122,9 @@ function InventoryController.Init()
 			refreshUI()
 		elseif key == "EquippedSword" and type(value) == "string" then
 			equippedSwordUid = value :: string
+			refreshUI()
+		elseif key == "PlacedSwords" and type(value) == "table" then
+			placedSwords = value :: { [string]: string }
 			refreshUI()
 		elseif key == "AutoSellRules" and type(value) == "table" then
 			autoSellRules = value :: { [string]: boolean }
@@ -121,6 +144,9 @@ function InventoryController.Init()
 			end
 			if type(data.EquippedSword) == "string" then
 				equippedSwordUid = data.EquippedSword
+			end
+			if type(data.PlacedSwords) == "table" then
+				placedSwords = data.PlacedSwords
 			end
 			if type(data.AutoSellRules) == "table" then
 				autoSellRules = data.AutoSellRules

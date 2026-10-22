@@ -14,6 +14,8 @@ local TextChatService = game:GetService("TextChatService")
 local DataService = require(ServerScriptService.Services.DataService)
 local TapService = require(ServerScriptService.Services.TapService)
 local RollService = require(ServerScriptService.Services.RollService)
+local PlotService = require(ServerScriptService.Services.PlotService)
+local InventoryService = require(ServerScriptService.Services.InventoryService)
 local Dice = require(ReplicatedStorage.Config.Dice)
 local NumberFormat = require(ReplicatedStorage.Shared.NumberFormat)
 local Remotes = require(ReplicatedStorage.Shared.Remotes)
@@ -108,7 +110,8 @@ local function onClearSwordsCommand(originTextSource: TextSource, _unfilteredTex
 
 	DataService.Set(player, "OwnedSwords", {})
 	DataService.Set(player, "EquippedSword", "")
-	say(player, "Swords cleared and unequipped!")
+	DataService.Set(player, "PlacedSwords", {})
+	say(player, "Swords cleared, unequipped, and removed from pedestals!")
 end
 
 local function onDiceCommand(originTextSource: TextSource, unfilteredText: string)
@@ -163,6 +166,92 @@ local function onResetDiceCommand(originTextSource: TextSource, _unfilteredText:
 	end
 end
 
+local function onPlaceCommand(originTextSource: TextSource, unfilteredText: string)
+	local player = Players:GetPlayerByUserId(originTextSource.UserId)
+	if player == nil then
+		return
+	end
+
+	local slotStr, invIdxStr = unfilteredText:match("^%S+%s+(%S+)%s+(%S+)")
+	local slot = tonumber(slotStr)
+	local invIdx = tonumber(invIdxStr)
+	if not slot or not invIdx then
+		say(player, "Usage: /place <slotIndex> <inventoryIndex> (e.g. /place 1 1)")
+		return
+	end
+
+	local owned = DataService.Get(player, "OwnedSwords")
+	if type(owned) ~= "table" or not owned[invIdx] then
+		say(player, ("Inventory sword #%d not found!"):format(invIdx))
+		return
+	end
+
+	local swordUid = owned[invIdx].uid
+	local ok, err = PlotService.PlaceSword(player, slot, swordUid)
+	if ok then
+		say(player, ("Placed sword '%s' (inv #%d) onto Pedestal Slot #%d!"):format(tostring(owned[invIdx].id), invIdx, slot))
+	else
+		say(player, "/place failed: " .. tostring(err))
+	end
+end
+
+local function onUnplaceCommand(originTextSource: TextSource, unfilteredText: string)
+	local player = Players:GetPlayerByUserId(originTextSource.UserId)
+	if player == nil then
+		return
+	end
+
+	local slotStr = unfilteredText:match("^%S+%s+(%S+)")
+	local slot = tonumber(slotStr)
+	if not slot then
+		say(player, "Usage: /unplace <slotIndex> (e.g. /unplace 1)")
+		return
+	end
+
+	local ok, err = PlotService.RemoveSword(player, slot)
+	if ok then
+		say(player, ("Removed sword from Pedestal Slot #%d!"):format(slot))
+	else
+		say(player, "/unplace failed: " .. tostring(err))
+	end
+end
+
+local function onFakeOfflineCommand(originTextSource: TextSource, unfilteredText: string)
+	local player = Players:GetPlayerByUserId(originTextSource.UserId)
+	if player == nil then
+		return
+	end
+
+	local nowArg, hoursArg = unfilteredText:match("^%S+%s+(now)%s+(%S+)")
+	if not nowArg then
+		hoursArg = unfilteredText:match("^%S+%s+(%S+)")
+	end
+
+	local hours = tonumber(hoursArg)
+	if not hours or hours <= 0 then
+		say(player, "Usage: /fakeoffline <hours> (stage for leave & rejoin) or /fakeoffline now <hours> (simulate immediately)")
+		return
+	end
+
+	if nowArg == "now" then
+		local earned, elapsed = PlotService.SimulateOfflineIncome(player, hours * 3600)
+		say(player, ("[FakeOffline] Simulated %s hours offline: Earned %s Gold (%d seconds)."):format(tostring(hours), NumberFormat.format(earned), elapsed))
+	else
+		DataService.SetMockOfflineHours(player, hours)
+		say(player, ("[FakeOffline] Staged %s hours offline for next leave & rejoin. Stop play and rejoin to test offline income calculation!"):format(tostring(hours)))
+	end
+end
+
+local function onEquipBestCommand(originTextSource: TextSource, _unfilteredText: string)
+	local player = Players:GetPlayerByUserId(originTextSource.UserId)
+	if player == nil then
+		return
+	end
+
+	local ok, msg = InventoryService.EquipBest(player)
+	say(player, msg or (if ok then "Equip Best succeeded!" else "Equip Best failed!"))
+end
+
 function DevCommands.Start()
 	if not RunService:IsStudio() then
 		return
@@ -203,6 +292,30 @@ function DevCommands.Start()
 	resetDiceCommand.PrimaryAlias = "/resetdice"
 	resetDiceCommand.Triggered:Connect(onResetDiceCommand)
 	resetDiceCommand.Parent = TextChatService
+
+	local placeCommand = Instance.new("TextChatCommand")
+	placeCommand.Name = "DevPlaceCommand"
+	placeCommand.PrimaryAlias = "/place"
+	placeCommand.Triggered:Connect(onPlaceCommand)
+	placeCommand.Parent = TextChatService
+
+	local unplaceCommand = Instance.new("TextChatCommand")
+	unplaceCommand.Name = "DevUnplaceCommand"
+	unplaceCommand.PrimaryAlias = "/unplace"
+	unplaceCommand.Triggered:Connect(onUnplaceCommand)
+	unplaceCommand.Parent = TextChatService
+
+	local fakeOfflineCommand = Instance.new("TextChatCommand")
+	fakeOfflineCommand.Name = "DevFakeOfflineCommand"
+	fakeOfflineCommand.PrimaryAlias = "/fakeoffline"
+	fakeOfflineCommand.Triggered:Connect(onFakeOfflineCommand)
+	fakeOfflineCommand.Parent = TextChatService
+
+	local equipBestCommand = Instance.new("TextChatCommand")
+	equipBestCommand.Name = "DevEquipBestCommand"
+	equipBestCommand.PrimaryAlias = "/equipbest"
+	equipBestCommand.Triggered:Connect(onEquipBestCommand)
+	equipBestCommand.Parent = TextChatService
 end
 
 return DevCommands

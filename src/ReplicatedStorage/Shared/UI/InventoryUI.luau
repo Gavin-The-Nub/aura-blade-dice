@@ -27,11 +27,20 @@ export type OwnedSwordEntry = {
 export type InventoryUIInstance = {
 	Open: (self: InventoryUIInstance) -> (),
 	Close: (self: InventoryUIInstance) -> (),
-	SetData: (self: InventoryUIInstance, ownedSwords: { OwnedSwordEntry }, equippedUid: string, autoSellRules: { [string]: boolean }) -> (),
+	SetData: (
+		self: InventoryUIInstance,
+		ownedSwords: { OwnedSwordEntry },
+		equippedUid: string,
+		autoSellRules: { [string]: boolean },
+		placedSwords: { [string]: string }?
+	) -> (),
 	SetOnEquip: (self: InventoryUIInstance, callback: (uid: string) -> ()) -> (),
 	SetOnUnequip: (self: InventoryUIInstance, callback: () -> ()) -> (),
 	SetOnSell: (self: InventoryUIInstance, callback: (uid: string) -> ()) -> (),
 	SetOnToggleAutoSell: (self: InventoryUIInstance, callback: (rarity: string, enabled: boolean) -> ()) -> (),
+	SetOnEquipBest: (self: InventoryUIInstance, callback: () -> ()) -> (),
+	SetEquipBestBusy: (self: InventoryUIInstance, isBusy: boolean) -> (),
+	ShowEquipBestMessage: (self: InventoryUIInstance, message: string, isSuccess: boolean?) -> (),
 	Destroy: (self: InventoryUIInstance) -> (),
 }
 
@@ -70,43 +79,65 @@ function InventoryUI.new(parentGui: Instance): InventoryUIInstance
 
 	local rootContent = popup.Content
 
-	-- Top Bar: Auto-Sell Header + Capacity counter
+	-- Top Bar: Capacity + Equip Best on Row 1; Auto-Sell Header on Row 2; Rarity Chips on Row 3
 	local topBar = Instance.new("Frame")
 	topBar.Name = "TopBar"
-	topBar.Size = UDim2.new(1, 0, 0, 68)
+	topBar.Size = UDim2.new(1, 0, 0, 80)
 	topBar.Position = UDim2.new(0, 0, 0, 0)
 	topBar.BackgroundTransparency = 1
 	topBar.Parent = rootContent
 
 	local countLabel = Instance.new("TextLabel")
 	countLabel.Name = "CountLabel"
-	countLabel.Size = UDim2.new(0.4, 0, 0, 20)
+	countLabel.Size = UDim2.new(0.5, -60, 0, 24)
 	countLabel.Position = UDim2.new(0, 4, 0, 0)
 	countLabel.BackgroundTransparency = 1
 	countLabel.Font = Theme.Fonts.Button
-	countLabel.TextSize = 13
+	countLabel.TextSize = 12
 	countLabel.TextColor3 = Theme.Colors.TextSecondary
 	countLabel.TextXAlignment = Enum.TextXAlignment.Left
 	countLabel.Text = "CAPACITY: 0/50"
 	countLabel.Parent = topBar
 
+	-- Forward reference for callback
+	local onEquipBestCallback: (() -> ())? = nil
+
+	-- Green "Equip Best" button right-aligned on Row 1 (never overlaps countLabel or Auto-Sell title)
+	local equipBestBtn = Button.new({
+		Name = "EquipBestButton",
+		Text = "EQUIP BEST",
+		Size = UDim2.new(0, 110, 0, 24),
+		Position = UDim2.new(1, -4, 0, 0),
+		AnchorPoint = Vector2.new(1, 0),
+		BackgroundColor = Color3.fromRGB(39, 174, 96),
+		BorderColor = Color3.fromRGB(46, 204, 113),
+		TextColor = Color3.fromRGB(255, 255, 255),
+		CornerRadius = Theme.Corner.Small,
+		Parent = topBar,
+		OnClick = function()
+			if onEquipBestCallback then
+				onEquipBestCallback()
+			end
+		end,
+	})
+
 	local autoSellTitle = Instance.new("TextLabel")
 	autoSellTitle.Name = "AutoSellTitle"
-	autoSellTitle.Size = UDim2.new(0.6, 0, 0, 20)
-	autoSellTitle.Position = UDim2.new(0.4, 0, 0, 0)
+	autoSellTitle.Size = UDim2.new(1, -8, 0, 16)
+	autoSellTitle.Position = UDim2.new(0, 4, 0, 26)
 	autoSellTitle.BackgroundTransparency = 1
 	autoSellTitle.Font = Theme.Fonts.Button
-	autoSellTitle.TextSize = 12
+	autoSellTitle.TextSize = 10
 	autoSellTitle.TextColor3 = Theme.Colors.TextGold
-	autoSellTitle.TextXAlignment = Enum.TextXAlignment.Right
+	autoSellTitle.TextXAlignment = Enum.TextXAlignment.Left
 	autoSellTitle.Text = "AUTO-SELL LOW RARITIES:"
 	autoSellTitle.Parent = topBar
 
 	-- Horizontal scrolling container for Auto-Sell rarity chips
 	local filterScroll = Instance.new("ScrollingFrame")
 	filterScroll.Name = "FilterScroll"
-	filterScroll.Size = UDim2.new(1, 0, 0, 40)
-	filterScroll.Position = UDim2.new(0, 0, 0, 24)
+	filterScroll.Size = UDim2.new(1, 0, 0, 34)
+	filterScroll.Position = UDim2.new(0, 0, 0, 44)
 	filterScroll.BackgroundTransparency = 1
 	filterScroll.ScrollBarThickness = 2
 	filterScroll.ScrollBarImageColor3 = Theme.Colors.Border
@@ -124,8 +155,8 @@ function InventoryUI.new(parentGui: Instance): InventoryUIInstance
 	-- Split Body: Left Grid (64%), Right Inspector (36%)
 	local body = Instance.new("Frame")
 	body.Name = "Body"
-	body.Size = UDim2.new(1, 0, 1, -74)
-	body.Position = UDim2.new(0, 0, 0, 74)
+	body.Size = UDim2.new(1, 0, 1, -84)
+	body.Position = UDim2.new(0, 0, 0, 84)
 	body.BackgroundTransparency = 1
 	body.Parent = rootContent
 
@@ -228,6 +259,78 @@ function InventoryUI.new(parentGui: Instance): InventoryUIInstance
 	inspStatus.Text = ""
 	inspStatus.Parent = inspContent
 
+	local feedbackLabel = Instance.new("TextLabel")
+	feedbackLabel.Name = "FeedbackLabel"
+	feedbackLabel.Size = UDim2.new(1, 0, 0, 36)
+	feedbackLabel.Position = UDim2.new(0, 0, 0, 94)
+	feedbackLabel.BackgroundTransparency = 1
+	feedbackLabel.Font = Theme.Fonts.Button
+	feedbackLabel.TextSize = 11
+	feedbackLabel.TextColor3 = Theme.Colors.AuraEmerald
+	feedbackLabel.TextWrapped = true
+	feedbackLabel.Text = ""
+	feedbackLabel.Parent = inspContent
+
+	-- Floating Toast Banner for Equip Best and action feedback
+	-- Positioned directly below top bar so it is visible even when no sword is selected
+	local toastFrame = Instance.new("Frame")
+	toastFrame.Name = "ToastFrame"
+	toastFrame.Size = UDim2.new(0.94, 0, 0, 28)
+	toastFrame.Position = UDim2.new(0.5, 0, 0, 86)
+	toastFrame.AnchorPoint = Vector2.new(0.5, 0)
+	toastFrame.BackgroundColor3 = Theme.Colors.PanelBackground
+	toastFrame.BackgroundTransparency = 0.05
+	toastFrame.BorderSizePixel = 0
+	toastFrame.ZIndex = 25
+	toastFrame.Visible = false
+	toastFrame.Parent = rootContent
+
+	local toastCorner = Instance.new("UICorner")
+	toastCorner.CornerRadius = Theme.Corner.Small
+	toastCorner.Parent = toastFrame
+
+	local toastStroke = Instance.new("UIStroke")
+	toastStroke.Name = "ToastStroke"
+	toastStroke.Color = Theme.Colors.AuraEmerald
+	toastStroke.Thickness = 1.5
+	toastStroke.Parent = toastFrame
+
+	local toastLabel = Instance.new("TextLabel")
+	toastLabel.Name = "ToastLabel"
+	toastLabel.Size = UDim2.new(1, -12, 1, 0)
+	toastLabel.Position = UDim2.new(0.5, 0, 0.5, 0)
+	toastLabel.AnchorPoint = Vector2.new(0.5, 0.5)
+	toastLabel.BackgroundTransparency = 1
+	toastLabel.Font = Theme.Fonts.Button
+	toastLabel.TextSize = 11
+	toastLabel.TextColor3 = Theme.Colors.AuraEmerald
+	toastLabel.TextWrapped = true
+	toastLabel.ZIndex = 26
+	toastLabel.Parent = toastFrame
+
+	local feedbackTimer: thread? = nil
+	local function showFeedback(msg: string, isSuccess: boolean?)
+		if feedbackTimer then
+			task.cancel(feedbackTimer)
+			feedbackTimer = nil
+		end
+		local color = if isSuccess ~= false then Theme.Colors.AuraEmerald else Theme.Colors.AuraCrimson
+
+		feedbackLabel.Text = msg
+		feedbackLabel.TextColor3 = color
+
+		toastLabel.Text = msg
+		toastLabel.TextColor3 = color
+		toastStroke.Color = color
+		toastFrame.Visible = true
+
+		feedbackTimer = task.delay(4, function()
+			feedbackLabel.Text = ""
+			toastFrame.Visible = false
+			feedbackTimer = nil
+		end)
+	end
+
 	-- Action buttons container (Equip and Sell)
 	local actionContainer = Instance.new("Frame")
 	actionContainer.Name = "ActionContainer"
@@ -324,6 +427,7 @@ function InventoryUI.new(parentGui: Instance): InventoryUIInstance
 	-- Internal state
 	local currentOwnedSwords: { OwnedSwordEntry } = {}
 	local currentEquippedUid = ""
+	local currentPlacedSwords: { [string]: string } = {}
 	local currentAutoSellRules: { [string]: boolean } = {}
 	local selectedUid: string? = nil
 
@@ -456,6 +560,14 @@ function InventoryUI.new(parentGui: Instance): InventoryUIInstance
 			local rarityName = swordDef and swordDef.rarity or "Common"
 			local rarityColor = (Swords.RarityColors and Swords.RarityColors[rarityName]) or Theme.Colors.AuraCyan
 			local isEquipped = (entry.uid == currentEquippedUid)
+			local placedSlot: number? = nil
+			for slotKey, pUid in currentPlacedSwords do
+				if pUid == entry.uid then
+					placedSlot = tonumber(slotKey) or 1
+					break
+				end
+			end
+			local isPlaced = (placedSlot ~= nil)
 			local isSelected = (entry.uid == selectedUid)
 
 			local card = Instance.new("Frame")
@@ -472,8 +584,11 @@ function InventoryUI.new(parentGui: Instance): InventoryUIInstance
 
 			local cardStroke = Instance.new("UIStroke")
 			cardStroke.Name = "CardStroke"
-			cardStroke.Color = isSelected and Theme.Colors.AuraGold or (isEquipped and Theme.Colors.AuraEmerald or rarityColor)
-			cardStroke.Thickness = isSelected and 2.5 or (isEquipped and 2 or 1.2)
+			cardStroke.Color = if isSelected then Theme.Colors.AuraGold
+				elseif isEquipped then Theme.Colors.AuraEmerald
+				elseif isPlaced then Theme.Colors.AuraCyan
+				else rarityColor
+			cardStroke.Thickness = isSelected and 2.5 or ((isEquipped or isPlaced) and 2 or 1.2)
 			cardStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
 			cardStroke.Parent = card
 
@@ -512,7 +627,7 @@ function InventoryUI.new(parentGui: Instance): InventoryUIInstance
 			nameLbl.Text = swordDef and swordDef.name or "Unknown"
 			nameLbl.Parent = card
 
-			-- Equipped Badge
+			-- Equipped or Placed Badge
 			if isEquipped then
 				local badge = Instance.new("Frame")
 				badge.Name = "EquippedBadge"
@@ -532,6 +647,28 @@ function InventoryUI.new(parentGui: Instance): InventoryUIInstance
 				badgeText.BackgroundTransparency = 1
 				badgeText.Text = "✓"
 				badgeText.TextColor3 = Theme.Colors.TextPrimary
+				badgeText.TextSize = 10
+				badgeText.Font = Theme.Fonts.Title
+				badgeText.Parent = badge
+			elseif isPlaced then
+				local badge = Instance.new("Frame")
+				badge.Name = "PlacedBadge"
+				badge.Size = UDim2.new(0, 24, 0, 16)
+				badge.Position = UDim2.new(1, -2, 0, 2)
+				badge.AnchorPoint = Vector2.new(1, 0)
+				badge.BackgroundColor3 = Theme.Colors.AuraCyan
+				badge.BorderSizePixel = 0
+				badge.Parent = card
+
+				local badgeCorner = Instance.new("UICorner")
+				badgeCorner.CornerRadius = Theme.Corner.Round
+				badgeCorner.Parent = badge
+
+				local badgeText = Instance.new("TextLabel")
+				badgeText.Size = UDim2.new(1, 0, 1, 0)
+				badgeText.BackgroundTransparency = 1
+				badgeText.Text = "P#" .. tostring(placedSlot)
+				badgeText.TextColor3 = Theme.Colors.PanelBackground
 				badgeText.TextSize = 10
 				badgeText.Font = Theme.Fonts.Title
 				badgeText.Parent = badge
@@ -583,6 +720,13 @@ function InventoryUI.new(parentGui: Instance): InventoryUIInstance
 		local rarityName = swordDef and swordDef.rarity or "Common"
 		local rarityColor = (Swords.RarityColors and Swords.RarityColors[rarityName]) or Theme.Colors.AuraCyan
 		local isEquipped = (selectedEntry.uid == currentEquippedUid)
+		local placedSlot: number? = nil
+		for slotKey, pUid in currentPlacedSwords do
+			if pUid == selectedEntry.uid then
+				placedSlot = tonumber(slotKey) or 1
+				break
+			end
+		end
 
 		inspName.Text = swordDef and swordDef.name or "Sword"
 		inspName.TextColor3 = rarityColor
@@ -596,16 +740,20 @@ function InventoryUI.new(parentGui: Instance): InventoryUIInstance
 			equipButton:SetText("UNEQUIP")
 			equipButton:SetBorderColor(Theme.Colors.Border)
 			equipButton:SetEnabled(true)
-
-			-- Rule 4: Server rejects selling the equipped one
 			sellButton:SetEnabled(false)
+		elseif placedSlot ~= nil then
+			inspStatus.Text = ("STATUS: PLACED ON PEDESTAL #%d"):format(placedSlot)
+			inspStatus.TextColor3 = Theme.Colors.AuraCyan
+			equipButton:SetText("PLACED")
+			equipButton:SetBorderColor(Theme.Colors.Border)
+			equipButton:SetEnabled(false) -- Disabled for placed swords
+			sellButton:SetEnabled(false)  -- Disabled for placed swords
 		else
 			inspStatus.Text = "STATUS: IN BACKPACK"
 			inspStatus.TextColor3 = Theme.Colors.TextSecondary
 			equipButton:SetText("EQUIP")
 			equipButton:SetBorderColor(rarityColor)
 			equipButton:SetEnabled(true)
-
 			sellButton:SetEnabled(true)
 		end
 	end
@@ -655,10 +803,11 @@ function InventoryUI.new(parentGui: Instance): InventoryUIInstance
 			popup:Close()
 			sellConfirmPopup:Close()
 		end,
-		SetData = function(_, ownedSwords: { OwnedSwordEntry }, equippedUid: string, autoSellRules: { [string]: boolean })
+		SetData = function(_, ownedSwords: { OwnedSwordEntry }, equippedUid: string, autoSellRules: { [string]: boolean }, placedSwords: { [string]: string }?)
 			currentOwnedSwords = ownedSwords or {}
 			currentEquippedUid = equippedUid or ""
 			currentAutoSellRules = autoSellRules or {}
+			currentPlacedSwords = placedSwords or {}
 			updateChips()
 			rebuildGrid()
 		end,
@@ -674,7 +823,23 @@ function InventoryUI.new(parentGui: Instance): InventoryUIInstance
 		SetOnToggleAutoSell = function(_, callback: (rarity: string, enabled: boolean) -> ())
 			onToggleAutoSellCallback = callback
 		end,
+		SetOnEquipBest = function(_, callback: () -> ())
+			onEquipBestCallback = callback
+		end,
+		SetEquipBestBusy = function(_, isBusy: boolean)
+			equipBestBtn:SetEnabled(not isBusy)
+			equipBestBtn:SetText(if isBusy then "EQUIPPING..." else "EQUIP BEST")
+		end,
+		ShowEquipBestMessage = function(_, message: string, isSuccess: boolean?)
+			showFeedback(message, isSuccess)
+		end,
 		Destroy = function(_)
+			if feedbackTimer then
+				task.cancel(feedbackTimer)
+				feedbackTimer = nil
+			end
+			toastFrame:Destroy()
+			equipBestBtn:Destroy()
 			cancelSellBtn:Destroy()
 			confirmSellBtn:Destroy()
 			equipButton:Destroy()

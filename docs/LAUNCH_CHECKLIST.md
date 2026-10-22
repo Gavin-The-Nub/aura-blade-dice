@@ -13,7 +13,11 @@ The following commands are implemented in `src/ServerScriptService/Services/DevC
 - [ ] **/gold `<amount>` / /gold +`<amount>`**: Sets or adds arbitrary Gold amounts.
 - [ ] **/fever [amount]**: Instantly triggers Fever Mode or sets Fever meter points.
 - [ ] **/rolltest [count]**: Runs high-speed roll probability simulations and prints statistics to Output.
-- [ ] **/clearswords**: Clears all owned swords and unequips active weapon.
+- [ ] **/clearswords**: Clears all owned swords, unequips active weapon, and empties pedestals.
+- [ ] **/place `<slot>` `<inventoryIndex>`**: Places sword from inventory index onto target pedestal slot.
+- [ ] **/unplace `<slot>`**: Removes sword from target pedestal slot.
+- [ ] **/fakeoffline [now] `<hours>`**: Stages or immediately simulates `<hours>` of offline income.
+- [ ] **/equipbest**: Automatically equips best damage sword and places top remaining swords onto pedestals.
 
 > **Production Safeguard:** Verify that `DevCommands.luau` includes `if not RunService:IsStudio() then return end` or is completely removed from `src/ServerScriptService/Services/` before production builds.
 

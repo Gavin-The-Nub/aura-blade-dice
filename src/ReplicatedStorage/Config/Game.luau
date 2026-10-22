@@ -23,6 +23,14 @@ local Game = {
 	Inventory = {
 		MaxSwords = 50, -- Maximum number of swords a player can store
 	},
+	Plot = {
+		MaxPlots = 8,
+		DefaultPedestalsPerPlot = 4,
+		PassiveRateMultiplier = 0.5, -- 50% Gold-per-tap every second
+		OfflineIncomeCapSeconds = 8 * 3600, -- 8-hour cap (28,800 seconds)
+		MinOfflineIncomePopupThreshold = 1, -- minimum Gold to trigger offline welcome popup
+		MinOfflineSeconds = 60, -- minimum offline seconds required for popup
+	},
 }
 
 return Game

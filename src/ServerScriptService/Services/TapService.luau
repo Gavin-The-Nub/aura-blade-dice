@@ -29,6 +29,8 @@ local feverThreads: { [Player]: thread } = {}
 local autoTapActive: { [Player]: boolean } = {}
 local autoTapThreads: { [Player]: thread } = {}
 local playerEquippedDamage: { [Player]: number } = {}
+local playerEquippedGoldPerTap: { [Player]: number } = {}
+local playerEquippedEntry: { [Player]: any } = {}
 
 local TapService = {}
 
@@ -38,15 +40,47 @@ for _, def in Swords do
 	swordMap[def.id] = def
 end
 
+-- Calculates expected Gold per tap with NO crit, NO Fever, and NO random effects.
+-- Base Damage × Grade × Enchant × Rebirth
+-- Active tapping and passive pedestal income both call this.
+function TapService.CalculateSwordGoldPerTap(player: Player, swordEntry: any): number
+	local baseDamage = GameConfig.Tap.UnarmedDamage
+	if type(swordEntry) == "table" then
+		local swordId = swordEntry.id
+		if type(swordId) == "string" then
+			local swordDef = swordMap[swordId]
+			if swordDef and type(swordDef.baseDamage) == "number" then
+				baseDamage = swordDef.baseDamage
+			end
+		end
+	elseif type(swordEntry) == "string" then
+		local swordDef = swordMap[swordEntry]
+		if swordDef and type(swordDef.baseDamage) == "number" then
+			baseDamage = swordDef.baseDamage
+		end
+	end
+
+	-- Multipliers (placeholders for future systems: Grade, Enchant, Rebirth)
+	local gradeMult = 1
+	local enchantMult = 1
+	local rebirthMult = 1
+
+	return baseDamage * gradeMult * enchantMult * rebirthMult
+end
+
 local function updateEquippedDamageCache(player: Player)
 	if not DataService.IsLoaded(player) then
 		playerEquippedDamage[player] = GameConfig.Tap.UnarmedDamage
+		playerEquippedGoldPerTap[player] = GameConfig.Tap.UnarmedDamage
+		playerEquippedEntry[player] = nil
 		return
 	end
 
 	local equippedUid = DataService.Get(player, "EquippedSword")
 	if type(equippedUid) ~= "string" or equippedUid == "" then
 		playerEquippedDamage[player] = GameConfig.Tap.UnarmedDamage
+		playerEquippedGoldPerTap[player] = GameConfig.Tap.UnarmedDamage
+		playerEquippedEntry[player] = nil
 		return
 	end
 
@@ -61,15 +95,18 @@ local function updateEquippedDamageCache(player: Player)
 		end
 	end
 
+	playerEquippedEntry[player] = foundEntry
 	if foundEntry and type(foundEntry.id) == "string" then
 		local swordDef = swordMap[foundEntry.id]
 		if swordDef then
 			playerEquippedDamage[player] = swordDef.baseDamage
+			playerEquippedGoldPerTap[player] = TapService.CalculateSwordGoldPerTap(player, foundEntry)
 			return
 		end
 	end
 
 	playerEquippedDamage[player] = GameConfig.Tap.UnarmedDamage
+	playerEquippedGoldPerTap[player] = GameConfig.Tap.UnarmedDamage
 end
 
 function TapService.GetEquippedDamage(player: Player): number
@@ -79,6 +116,10 @@ function TapService.GetEquippedDamage(player: Player): number
 		damage = playerEquippedDamage[player] or GameConfig.Tap.UnarmedDamage
 	end
 	return damage
+end
+
+function TapService.GetEquippedEntry(player: Player): any?
+	return playerEquippedEntry[player]
 end
 
 function TapService.RefreshEquippedDamage(player: Player)
@@ -225,16 +266,11 @@ end
 
 -- Calculates gold per tap: Base Damage × Grade × Enchant × Rebirth × Crit
 local function calculateTapEarnings(player: Player): (number, boolean)
-	local baseDamage = playerEquippedDamage[player]
-	if baseDamage == nil then
+	local baseGold = playerEquippedGoldPerTap[player]
+	if baseGold == nil then
 		updateEquippedDamageCache(player)
-		baseDamage = playerEquippedDamage[player] or GameConfig.Tap.UnarmedDamage
+		baseGold = playerEquippedGoldPerTap[player] or GameConfig.Tap.UnarmedDamage
 	end
-
-	-- Multipliers (placeholders for future systems: Grade, Enchant, Rebirth)
-	local gradeMult = 1
-	local enchantMult = 1
-	local rebirthMult = 1
 
 	-- Crit calculation: 10% base chance for 2.5x multiplier, or 100% in Fever Mode
 	local feverActive = isFeverActive(player)
@@ -242,7 +278,7 @@ local function calculateTapEarnings(player: Player): (number, boolean)
 	local isCrit = math.random() < critChance
 	local critBonus = if isCrit then GameConfig.Tap.CritMultiplier else 1
 
-	local goldEarned = baseDamage * gradeMult * enchantMult * rebirthMult * critBonus
+	local goldEarned = baseGold * critBonus
 	return goldEarned, isCrit
 end
 
@@ -374,6 +410,8 @@ function TapService.Start()
 	Players.PlayerRemoving:Connect(function(player)
 		playerBuckets[player] = nil
 		playerEquippedDamage[player] = nil
+		playerEquippedGoldPerTap[player] = nil
+		playerEquippedEntry[player] = nil
 
 		-- Clean up Auto-Tap
 		autoTapActive[player] = nil

@@ -14,6 +14,8 @@ export type PlayerData = {
 	OwnedDice: { [string]: boolean }, -- set of owned tiers ("1", "2", ...)
 	LastLogout: number, -- unix seconds, used later for offline Gold
 	AutoSellRules: { [string]: boolean }, -- rarity -> boolean
+	PlacedSwords: { [string]: string }, -- pedestal slot string ("1".."10") -> sword uid
+	PedestalSlots: number, -- active pedestal capacity (default 4)
 }
 
 local DataTemplate: PlayerData = {
@@ -37,6 +39,8 @@ local DataTemplate: PlayerData = {
 		Mythic = false,
 		Secret = false,
 	},
+	PlacedSwords = {},
+	PedestalSlots = 4,
 }
 
 return DataTemplate

@@ -13,6 +13,7 @@ local RunService = game:GetService("RunService")
 local ServerScriptService = game:GetService("ServerScriptService")
 
 local DataTemplate = require(ReplicatedStorage.Config.DataTemplate)
+local GameConfig = require(ReplicatedStorage.Config.Game)
 local Remotes = require(ReplicatedStorage.Shared.Remotes)
 local ProfileStore = require(ServerScriptService.Vendor.ProfileStore) :: any
 
@@ -32,6 +33,7 @@ local NON_NEGATIVE_KEYS: { [string]: boolean } = {
 	Rebirths = true,
 	DiceTier = true,
 	LastLogout = true,
+	PedestalSlots = true,
 }
 
 ProfileStore.SetConstant("AUTO_SAVE_PERIOD", AUTO_SAVE_SECONDS)
@@ -40,12 +42,19 @@ ProfileStore.SetConstant("START_SESSION_TIMEOUT", ATTEMPT_TIMEOUT_SECONDS)
 local playerStore = ProfileStore.New(STORE_NAME, DataTemplate)
 
 local profiles: { [Player]: any } = {}
+local mockOfflineHours: { [Player]: number } = {}
 local changedEvent = Instance.new("BindableEvent")
 
 local DataService = {}
 
 -- Fires (player, key, newValue) after any successful Set/Increment.
 DataService.Changed = changedEvent.Event
+
+-- Sets a mock offline duration (in hours) to be stamped when this player disconnects.
+-- Studio-only testing helper for /fakeoffline command.
+function DataService.SetMockOfflineHours(player: Player, hours: number)
+	mockOfflineHours[player] = hours
+end
 
 local function profileKey(player: Player): string
 	return tostring(player.UserId)
@@ -81,7 +90,15 @@ local function releaseProfile(player: Player)
 		return
 	end
 	profiles[player] = nil -- clear first so OnSessionEnd below doesn't try to kick
-	profile.Data.LastLogout = os.time()
+
+	local mockHours = mockOfflineHours[player]
+	mockOfflineHours[player] = nil
+	if mockHours and mockHours > 0 then
+		profile.Data.LastLogout = os.time() - math.floor(mockHours * 3600)
+	else
+		profile.Data.LastLogout = os.time()
+	end
+
 	profile.Data.Gold = math.floor(profile.Data.Gold + 0.5) -- whole Gold only when saving
 	profile:EndSession()
 end
@@ -153,6 +170,46 @@ local function onPlayerAdded(player: Player)
 		end
 	end
 
+	-- Migrate PedestalSlots: default to GameConfig.Plot.DefaultPedestalsPerPlot
+	if type(profile.Data.PedestalSlots) ~= "number" or profile.Data.PedestalSlots < 1 then
+		profile.Data.PedestalSlots = GameConfig.Plot.DefaultPedestalsPerPlot
+	end
+	local maxPedestalSlots = profile.Data.PedestalSlots
+
+	-- Migrate PlacedSwords:
+	-- Drop invalid slot keys (not "1".."10"), slots > PedestalSlots, unowned swords,
+	-- duplicate swords across multiple slots (keep lowest slot), and currently equipped sword
+	if type(profile.Data.PlacedSwords) ~= "table" then
+		profile.Data.PlacedSwords = {}
+	else
+		local owned = profile.Data.OwnedSwords
+		local ownedMap: { [string]: boolean } = {}
+		if type(owned) == "table" then
+			for _, entry in owned do
+				if type(entry) == "table" and type(entry.uid) == "string" then
+					ownedMap[entry.uid] = true
+				end
+			end
+		end
+
+		local equippedUid = profile.Data.EquippedSword
+		local cleanedPlaced: { [string]: string } = {}
+		local seenUids: { [string]: number } = {} -- uid -> lowest slot number
+
+		for slotNum = 1, math.min(10, maxPedestalSlots) do
+			local slotKey = tostring(slotNum)
+			local uid = profile.Data.PlacedSwords[slotKey]
+			if type(uid) == "string" and uid ~= "" then
+				if ownedMap[uid] and uid ~= equippedUid and not seenUids[uid] then
+					cleanedPlaced[slotKey] = uid
+					seenUids[uid] = slotNum
+				end
+			end
+		end
+
+		profile.Data.PlacedSwords = cleanedPlaced
+	end
+
 	profile.OnSessionEnd:Connect(function()
 		-- Fires when another server steals the session (or on release). Only kick on a steal.
 		if profiles[player] == profile then
@@ -187,6 +244,21 @@ function DataService.Start()
 	for _, player in Players:GetPlayers() do
 		task.spawn(onPlayerAdded, player)
 	end
+
+	-- Periodically refresh LastLogout on active profiles so that a server crash
+	-- does not result in hours of free offline income when ProfileStore autosaves.
+	-- If a mock offline duration is staged via /fakeoffline, skip overwriting it.
+	task.spawn(function()
+		while true do
+			task.wait(AUTO_SAVE_SECONDS)
+			local now = os.time()
+			for player, profile in profiles do
+				if player.Parent == Players and profile.Data and not mockOfflineHours[player] then
+					profile.Data.LastLogout = now
+				end
+			end
+		end
+	end)
 
 	-- ProfileStore already saves everything on shutdown; this additionally stamps
 	-- LastLogout for any profile PlayerRemoving didn't get to, and waits for them to release.
@@ -277,6 +349,76 @@ function DataService.Set(player: Player, key: string, value: any): boolean
 			end
 		end)
 	end
+	return true
+end
+
+-- Validates and writes multiple fields atomically without yielding between them.
+-- Fires Changed / DataChanged only after all keys are successfully updated.
+-- If any key fails validation or writing, nothing is applied (rollback) and returns false.
+function DataService.SetMany(player: Player, updates: { [string]: any }): boolean
+	local profile = profiles[player]
+	if profile == nil or typeof(updates) ~= "table" then
+		return false
+	end
+
+	-- Pre-validation step
+	local sanitized: { [string]: any } = {}
+	local oldValues: { [string]: any } = {}
+
+	for key, value in updates do
+		local templateValue = (DataTemplate :: any)[key]
+		if templateValue == nil or type(value) ~= type(templateValue) then
+			return false
+		end
+		if type(value) == "number" then
+			if value ~= value or value == math.huge or value == -math.huge then
+				return false
+			end
+			if NON_NEGATIVE_KEYS[key] and value < 0 then
+				return false
+			end
+			if key == "Gold" then
+				value = math.floor(value + 0.5)
+			end
+		end
+		sanitized[key] = value
+		oldValues[key] = profile.Data[key]
+	end
+
+	-- Synchronous write without yields, with rollback safeguard
+	local ok, err = pcall(function()
+		for key, value in sanitized do
+			profile.Data[key] = value
+		end
+	end)
+
+	if not ok then
+		-- Rollback
+		for key, oldVal in oldValues do
+			profile.Data[key] = oldVal
+		end
+		warn(("[DataService.SetMany] Failed to apply updates for %s, rolled back: %s"):format(player.Name, tostring(err)))
+		return false
+	end
+
+	-- Fire Changed events after all fields are set
+	for key, value in sanitized do
+		changedEvent:Fire(player, key, value)
+	end
+
+	if player.Parent == Players then
+		task.spawn(function()
+			local okEvent, event = pcall(function()
+				return Remotes.getEvent("DataChanged")
+			end)
+			if okEvent and event then
+				for key, value in sanitized do
+					event:FireClient(player, key, value)
+				end
+			end
+		end)
+	end
+
 	return true
 end
 

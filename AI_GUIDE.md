@@ -48,6 +48,7 @@ ReplicatedStorage/
 ServerScriptService/
   Services/      -- DataService, TapService, RollService, PlotService, RebirthService, TrialService, EventService
   Main (Script)  -- starts all services
+  PlayerActionLock (ModuleScript) -- lives at ServerScriptService/PlayerActionLock on purpose (not in Services/, so Main doesn't try to Start it)
 StarterPlayer/
   StarterPlayerScripts/
     Controllers/ -- UI and input controllers

@@ -5,12 +5,14 @@
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local TweenService = game:GetService("TweenService")
+local UserInputService = game:GetService("UserInputService")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Theme = require(Shared:WaitForChild("Theme"))
 local NumberFormat = require(Shared:WaitForChild("NumberFormat"))
 local Assets = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Assets"))
 local Swords = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Swords"))
+local GameConfig = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Game"))
 
 local Components = script.Parent.Parent:WaitForChild("Components")
 local Popup = require(Components:WaitForChild("Popup"))
@@ -174,16 +176,7 @@ function MainHUD.new(parentGui: Instance): MainHUDInstance
 	root.BackgroundTransparency = 1
 	root.Parent = screenGui
 
-	-- 1. Fullscreen interactive Tap Area (layered behind HUD buttons)
-	local tapArea = Instance.new("TextButton")
-	tapArea.Name = "TapArea"
-	tapArea.Size = UDim2.new(1, 0, 1, 0)
-	tapArea.BackgroundTransparency = 1
-	tapArea.Text = ""
-	tapArea.AutoButtonColor = false
-	tapArea.ZIndex = 1
-	tapArea.Parent = root
-
+	-- Tap handling via UserInputService (does not block camera drag / right-mouse drag)
 	local onTapCallback: ((Vector2) -> ())? = nil
 
 	-- Visual slash/tap spark effect
@@ -212,12 +205,70 @@ function MainHUD.new(parentGui: Instance): MainHUDInstance
 		end)
 	end
 
-	tapArea.InputBegan:Connect(function(input)
-		if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+	local function triggerTap(pos: Vector2)
+		playTapSpark(pos)
+		if onTapCallback then
+			onTapCallback(pos)
+		end
+	end
+
+	-- Mobile touch tracking: only counts as a tap if duration <= 0.25s, moved <= 15px, and not over UI
+	type TouchRecord = {
+		startTime: number,
+		startPos: Vector2,
+	}
+	local activeTouches: { [InputObject]: TouchRecord } = {}
+
+	local inputBeganConn = UserInputService.InputBegan:Connect(function(input: InputObject, gameProcessedEvent: boolean)
+		if gameProcessedEvent then
+			return
+		end
+
+		if input.UserInputType == Enum.UserInputType.MouseButton1 then
+			-- PC: left click in open space
 			local pos = Vector2.new(input.Position.X, input.Position.Y)
-			playTapSpark(pos)
-			if onTapCallback then
-				onTapCallback(pos)
+			triggerTap(pos)
+		elseif input.UserInputType == Enum.UserInputType.Touch then
+			-- Mobile: track candidate touch
+			activeTouches[input] = {
+				startTime = os.clock(),
+				startPos = Vector2.new(input.Position.X, input.Position.Y),
+			}
+		elseif input.UserInputType == Enum.UserInputType.Keyboard then
+			-- PC: Tap action key if configured in GameConfig
+			local actionKey = (GameConfig.Tap :: any).ActionKey
+			if actionKey and input.KeyCode == actionKey then
+				local cam = workspace.CurrentCamera
+				local vp = cam and cam.ViewportSize or Vector2.new(400, 300)
+				triggerTap(Vector2.new(vp.X / 2, vp.Y / 2))
+			end
+		end
+	end)
+
+	local inputChangedConn = UserInputService.InputChanged:Connect(function(input: InputObject)
+		if input.UserInputType == Enum.UserInputType.Touch then
+			local record = activeTouches[input]
+			if record then
+				local curPos = Vector2.new(input.Position.X, input.Position.Y)
+				if (curPos - record.startPos).Magnitude > 15 then
+					-- Moved > 15px: camera rotation / drag gesture, disqualify from being a tap
+					activeTouches[input] = nil
+				end
+			end
+		end
+	end)
+
+	local inputEndedConn = UserInputService.InputEnded:Connect(function(input: InputObject, _gameProcessedEvent: boolean)
+		if input.UserInputType == Enum.UserInputType.Touch then
+			local record = activeTouches[input]
+			if record then
+				activeTouches[input] = nil
+				local duration = os.clock() - record.startTime
+				local endPos = Vector2.new(input.Position.X, input.Position.Y)
+				local distance = (endPos - record.startPos).Magnitude
+				if duration <= 0.25 and distance <= 15 then
+					triggerTap(endPos)
+				end
 			end
 		end
 	end)
@@ -997,6 +1048,16 @@ function MainHUD.new(parentGui: Instance): MainHUDInstance
 			spawnFloatingDamageNumber(pos, amount, isCrit)
 		end,
 		Destroy = function(_)
+			if inputBeganConn then
+				inputBeganConn:Disconnect()
+			end
+			if inputChangedConn then
+				inputChangedConn:Disconnect()
+			end
+			if inputEndedConn then
+				inputEndedConn:Disconnect()
+			end
+			table.clear(activeTouches)
 			if feverCountdownThread then
 				task.cancel(feverCountdownThread)
 				feverCountdownThread = nil

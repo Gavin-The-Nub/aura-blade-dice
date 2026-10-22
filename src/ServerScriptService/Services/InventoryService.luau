@@ -7,8 +7,11 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local ServerScriptService = game:GetService("ServerScriptService")
 
 local Swords = require(ReplicatedStorage.Config.Swords)
+local GameConfig = require(ReplicatedStorage.Config.Game)
 local Remotes = require(ReplicatedStorage.Shared.Remotes)
 local DataService = require(ServerScriptService.Services.DataService)
+local TapService = require(ServerScriptService.Services.TapService)
+local PlayerActionLock = require(ServerScriptService.PlayerActionLock)
 
 local InventoryService = {}
 
@@ -20,6 +23,18 @@ type RateLimitBucket = {
 local playerBuckets: { [Player]: RateLimitBucket } = {}
 local RATE_LIMIT_CAPACITY = 8
 local RATE_LIMIT_REFILL_PER_SEC = 4
+
+-- Cached sword definitions
+local swordDefMap: { [string]: Swords.SwordDef } = {}
+for _, def in Swords do
+	swordDefMap[def.id] = def
+end
+
+-- Rarity rank for tie-breaking (higher is better)
+local rarityRank: { [string]: number } = {}
+for idx, rarity in ipairs(Swords.Rarities) do
+	rarityRank[rarity] = idx
+end
 
 local function checkRateLimit(player: Player): boolean
 	local now = os.clock()
@@ -45,7 +60,7 @@ local function checkRateLimit(player: Player): boolean
 	return false
 end
 
--- Equips a sword by its unique instance id (uid), or uneips if uid == ""
+-- Equips a sword by its unique instance id (uid), or unequips if uid == ""
 function InventoryService.Equip(player: Player, uid: string): (boolean, string?)
 	if not checkRateLimit(player) then
 		return false, "Action rate limited. Please slow down."
@@ -59,39 +74,69 @@ function InventoryService.Equip(player: Player, uid: string): (boolean, string?)
 		return false, "Data is loading..."
 	end
 
-	-- Unequip if empty string
-	if uid == "" then
-		DataService.Set(player, "EquippedSword", "")
-		return true, nil
+	if not PlayerActionLock.Acquire(player) then
+		return false, "Another inventory or pedestal action is in progress."
 	end
 
-	-- Check ownership
-	local ownedSwords = DataService.Get(player, "OwnedSwords")
-	if typeof(ownedSwords) ~= "table" then
-		return false, "No swords owned."
-	end
-
-	local found = false
-	for _, entry in ownedSwords do
-		if typeof(entry) == "table" and entry.uid == uid then
-			found = true
-			break
+	local ok, success, errMsg = pcall(function(): (boolean, string?)
+		-- Unequip if empty string
+		if uid == "" then
+			DataService.Set(player, "EquippedSword", "")
+			return true, nil
 		end
+
+		-- Check ownership
+		local ownedSwords = DataService.Get(player, "OwnedSwords")
+		if typeof(ownedSwords) ~= "table" then
+			return false, "No swords owned."
+		end
+
+		local found = false
+		for _, entry in ownedSwords do
+			if typeof(entry) == "table" and entry.uid == uid then
+				found = true
+				break
+			end
+		end
+
+		if not found then
+			return false, "You do not own this sword."
+		end
+
+		-- Reject equipping a sword placed on a pedestal
+		local placedSwords = DataService.Get(player, "PlacedSwords")
+		if typeof(placedSwords) == "table" then
+			for _, placedUid in placedSwords do
+				if placedUid == uid then
+					return false, "Cannot equip a sword placed on a pedestal! Remove it first."
+				end
+			end
+		end
+
+		local saved = DataService.Set(player, "EquippedSword", uid)
+		if saved then
+			return true, nil
+		else
+			return false, "Failed to equip sword."
+		end
+	end)
+
+	PlayerActionLock.Release(player)
+
+	if not ok then
+		warn(("[InventoryService.Equip] Error for %s: %s"):format(player.Name, tostring(success)))
+		return false, "An unexpected error occurred while equipping sword."
 	end
 
-	if not found then
-		return false, "You do not own this sword."
-	end
-
-	local success = DataService.Set(player, "EquippedSword", uid)
-	if success then
-		return true, nil
-	else
-		return false, "Failed to equip sword."
-	end
+	return success, errMsg
 end
 
--- Sells (removes) a sword by its uid. Equipped swords cannot be sold.
+-- Unequips currently equipped sword. Protected by PlayerActionLock via Equip(player, "").
+function InventoryService.Unequip(player: Player): (boolean, string?)
+	return InventoryService.Equip(player, "")
+end
+
+-- Sells (removes) a sword by its uid. Equipped swords and pedestal swords cannot be sold.
 function InventoryService.Sell(player: Player, uid: string): (boolean, string?)
 	if not checkRateLimit(player) then
 		return false, "Action rate limited. Please slow down."
@@ -105,36 +150,196 @@ function InventoryService.Sell(player: Player, uid: string): (boolean, string?)
 		return false, "Data is loading..."
 	end
 
-	local equippedUid = DataService.Get(player, "EquippedSword")
-	if equippedUid == uid then
-		return false, "Cannot sell your currently equipped sword!"
+	if not PlayerActionLock.Acquire(player) then
+		return false, "Another inventory or pedestal action is in progress."
 	end
 
-	local ownedSwords = DataService.Get(player, "OwnedSwords")
-	if typeof(ownedSwords) ~= "table" then
-		return false, "No swords owned."
-	end
-
-	local targetIndex = nil
-	for i, entry in ipairs(ownedSwords) do
-		if typeof(entry) == "table" and entry.uid == uid then
-			targetIndex = i
-			break
+	local ok, success, errMsg = pcall(function(): (boolean, string?)
+		local equippedUid = DataService.Get(player, "EquippedSword")
+		if equippedUid == uid then
+			return false, "Cannot sell your currently equipped sword!"
 		end
+
+		-- Reject selling a sword placed on a pedestal
+		local placedSwords = DataService.Get(player, "PlacedSwords")
+		if typeof(placedSwords) == "table" then
+			for _, placedUid in placedSwords do
+				if placedUid == uid then
+					return false, "Cannot sell a sword placed on a pedestal!"
+				end
+			end
+		end
+
+		local ownedSwords = DataService.Get(player, "OwnedSwords")
+		if typeof(ownedSwords) ~= "table" then
+			return false, "No swords owned."
+		end
+
+		local targetIndex = nil
+		for i, entry in ipairs(ownedSwords) do
+			if typeof(entry) == "table" and entry.uid == uid then
+				targetIndex = i
+				break
+			end
+		end
+
+		if not targetIndex then
+			return false, "You do not own this sword."
+		end
+
+		local updated = table.clone(ownedSwords)
+		table.remove(updated, targetIndex)
+		local saved = DataService.Set(player, "OwnedSwords", updated)
+		if saved then
+			return true, nil
+		else
+			return false, "Failed to sell sword."
+		end
+	end)
+
+	PlayerActionLock.Release(player)
+
+	if not ok then
+		warn(("[InventoryService.Sell] Error for %s: %s"):format(player.Name, tostring(success)))
+		return false, "An unexpected error occurred while selling sword."
 	end
 
-	if not targetIndex then
-		return false, "You do not own this sword."
+	return success, errMsg
+end
+
+-- Ranks all owned swords by GoldPerTap descending (ties broken by rarity rank then uid)
+local function rankSwords(player: Player, swords: { any }): { any }
+	local sorted = table.clone(swords)
+	table.sort(sorted, function(a, b)
+		local gptA = TapService.CalculateSwordGoldPerTap(player, a)
+		local gptB = TapService.CalculateSwordGoldPerTap(player, b)
+		if gptA ~= gptB then
+			return gptA > gptB
+		end
+
+		local defA = swordDefMap[a.id]
+		local defB = swordDefMap[b.id]
+		local rankA = if defA then rarityRank[defA.rarity] or 0 else 0
+		local rankB = if defB then rarityRank[defB.rarity] or 0 else 0
+		if rankA ~= rankB then
+			return rankA > rankB
+		end
+
+		local uidA = if type(a.uid) == "string" then a.uid else ""
+		local uidB = if type(b.uid) == "string" then b.uid else ""
+		return uidA < uidB
+	end)
+	return sorted
+end
+
+-- Equips the single best sword and assigns the next PedestalSlots swords onto pedestals 1..PedestalSlots.
+-- Atomically writes EquippedSword and PlacedSwords via DataService.SetMany.
+function InventoryService.EquipBest(player: Player): (boolean, string?)
+	if not checkRateLimit(player) then
+		return false, "Action rate limited. Please slow down."
 	end
 
-	local updated = table.clone(ownedSwords)
-	table.remove(updated, targetIndex)
-	local success = DataService.Set(player, "OwnedSwords", updated)
-	if success then
-		return true, nil
-	else
-		return false, "Failed to sell sword."
+	if not DataService.IsLoaded(player) then
+		return false, "Data is loading..."
 	end
+
+	if not PlayerActionLock.Acquire(player) then
+		return false, "Another inventory or pedestal action is in progress."
+	end
+
+	local ok, success, msg = pcall(function(): (boolean, string?)
+		local ownedSwords = DataService.Get(player, "OwnedSwords")
+		if typeof(ownedSwords) ~= "table" or #ownedSwords == 0 then
+			return true, "No swords in inventory! Roll the dice to pull swords."
+		end
+
+		local oldEquipped = DataService.Get(player, "EquippedSword")
+		if typeof(oldEquipped) ~= "string" then
+			oldEquipped = ""
+		end
+
+		local oldPlaced = DataService.Get(player, "PlacedSwords")
+		local oldPlacedMap: { [string]: string } = {}
+		if typeof(oldPlaced) == "table" then
+			for k, v in oldPlaced do
+				if typeof(k) == "string" and typeof(v) == "string" then
+					oldPlacedMap[k] = v
+				end
+			end
+		end
+
+		local pedestalSlots = DataService.Get(player, "PedestalSlots") or GameConfig.Plot.DefaultPedestalsPerPlot
+		if typeof(pedestalSlots) ~= "number" then
+			pedestalSlots = 4
+		end
+		pedestalSlots = math.clamp(math.floor(pedestalSlots), 1, 10)
+
+		-- Rank swords descending
+		local ranked = rankSwords(player, ownedSwords)
+
+		-- Top sword becomes equipped
+		local targetEquippedUid = ranked[1].uid
+
+		-- Next PedestalSlots swords go to pedestals 1..PedestalSlots
+		local targetPlaced: { [string]: string } = {}
+		local placedCount = 0
+		for slot = 1, pedestalSlots do
+			local candidateIdx = 1 + slot
+			if candidateIdx <= #ranked then
+				targetPlaced[tostring(slot)] = ranked[candidateIdx].uid
+				placedCount += 1
+			end
+		end
+
+		-- Check if anything changes (skip writes if nothing changes)
+		local sameEquipped = (targetEquippedUid == oldEquipped)
+		local samePlaced = true
+		for slot = 1, 10 do
+			local k = tostring(slot)
+			if (targetPlaced[k] or "") ~= (oldPlacedMap[k] or "") then
+				samePlaced = false
+				break
+			end
+		end
+		for k, _ in oldPlacedMap do
+			if not targetPlaced[k] then
+				samePlaced = false
+				break
+			end
+		end
+
+		if sameEquipped and samePlaced then
+			return true, "Best swords already equipped and placed!"
+		end
+
+		-- Atomically update EquippedSword and PlacedSwords
+		local saved = DataService.SetMany(player, {
+			EquippedSword = targetEquippedUid,
+			PlacedSwords = targetPlaced,
+		})
+
+		if not saved then
+			return false, "Failed to save equipped and placed swords."
+		end
+
+		local bestDef = swordDefMap[ranked[1].id]
+		local bestName = if bestDef then bestDef.name else "best sword"
+		local reply = ("Equipped %s and filled %d pedestal%s"):format(
+			bestName,
+			placedCount,
+			if placedCount == 1 then "" else "s"
+		)
+		return true, reply
+	end)
+
+	PlayerActionLock.Release(player)
+
+	if not ok then
+		warn(("[InventoryService.EquipBest] Error for %s: %s"):format(player.Name, tostring(success)))
+		return false, "An unexpected error occurred while equipping best swords."
+	end
+
+	return success, msg
 end
 
 -- Toggles auto-sell rule for a specific rarity
@@ -177,6 +382,11 @@ function InventoryService.Start()
 			return false, "Invalid argument."
 		end
 		return InventoryService.Sell(player, uid)
+	end
+
+	local equipBestFunc = Remotes.getFunction("EquipBest")
+	equipBestFunc.OnServerInvoke = function(player: Player)
+		return InventoryService.EquipBest(player)
 	end
 
 	local setAutoSellEvent = Remotes.getEvent("SetAutoSellRule")

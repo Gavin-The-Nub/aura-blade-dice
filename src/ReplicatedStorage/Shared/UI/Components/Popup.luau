@@ -131,7 +131,11 @@ function Popup.new(config: PopupConfig): PopupComponent
 	end
 
 	local function closeDialog()
-		if not isOpen then return end
+		if not isOpen then
+			scrim.Visible = false
+			scrim.Active = false
+			return
+		end
 		isOpen = false
 		scrim.Active = false
 		local tween = TweenService:Create(dialogScale, Theme.Transitions.Fast, { Scale = 0.85 })
@@ -140,6 +144,7 @@ function Popup.new(config: PopupConfig): PopupComponent
 		tween.Completed:Connect(function()
 			if not isOpen then
 				scrim.Visible = false
+				scrim.Active = false
 				if config.OnClose then
 					config.OnClose()
 				end
@@ -175,6 +180,9 @@ function Popup.new(config: PopupConfig): PopupComponent
 			titleLabel.Text = title:upper()
 		end,
 		Destroy = function(_)
+			isOpen = false
+			scrim.Visible = false
+			scrim.Active = false
 			closeBtn:Destroy()
 			scrim:Destroy()
 		end,
