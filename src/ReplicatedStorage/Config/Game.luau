@@ -31,6 +31,11 @@ local Game = {
 		MinOfflineIncomePopupThreshold = 1, -- minimum Gold to trigger offline welcome popup
 		MinOfflineSeconds = 60, -- minimum offline seconds required for popup
 	},
+	TargetDummy = {
+		NearDistance = 18, -- Studs from player to dummy for hit reaction
+		MaxFloatingNumbers = 6, -- Cap of active 3D floating damage numbers
+		SparkThrottle = 0.1, -- Minimum seconds between particle spark bursts
+	},
 }
 
 return Game

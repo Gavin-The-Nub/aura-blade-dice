@@ -24,6 +24,7 @@ export type Theme = {
 		TextSecondary: Color3,
 		TextMuted: Color3,
 		TextGold: Color3,
+		TextCrit: Color3,
 		
 		ButtonPrimary: Color3,
 		ButtonSecondary: Color3,
@@ -81,6 +82,7 @@ local Theme: Theme = {
 		TextSecondary = Color3.fromRGB(170, 180, 200),
 		TextMuted = Color3.fromRGB(110, 120, 140),
 		TextGold = Color3.fromRGB(255, 220, 75),
+		TextCrit = Color3.fromRGB(255, 170, 0),
 
 		ButtonPrimary = Color3.fromRGB(30, 41, 64),
 		ButtonSecondary = Color3.fromRGB(22, 28, 42),

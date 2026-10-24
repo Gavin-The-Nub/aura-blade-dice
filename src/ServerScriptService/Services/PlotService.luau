@@ -19,6 +19,7 @@ local PlayerActionLock = require(ServerScriptService.PlayerActionLock)
 
 local PLOT_TAG = "Plot"
 local PEDESTAL_TAG = "Pedestal"
+local TARGET_DUMMY_TAG = "TargetDummy"
 local DEFAULT_PLOTS_FOLDER_NAME = "Plots"
 
 local swordDefMap: { [string]: Swords.SwordDef } = {}
@@ -157,6 +158,102 @@ local function updateOwnerSign(plotId: number, player: Player?)
 	end
 end
 
+-- Helper to create a placeholder target dummy at the front of a plot relative to its CFrame
+local function createPlaceholderDummy(plotInstance: Instance, plotId: number): Model?
+	local floor: BasePart? = nil
+	if plotInstance:IsA("Model") then
+		if plotInstance.PrimaryPart and (plotInstance.PrimaryPart.Name == "PlotFloor" or plotInstance.PrimaryPart.Name == "Floor" or plotInstance.PrimaryPart.Name == "Platform") then
+			floor = plotInstance.PrimaryPart
+		else
+			local namedFloor = plotInstance:FindFirstChild("PlotFloor") or plotInstance:FindFirstChild("Floor")
+			if namedFloor and namedFloor:IsA("BasePart") then
+				floor = namedFloor
+			elseif plotInstance.PrimaryPart then
+				floor = plotInstance.PrimaryPart
+			end
+		end
+	elseif plotInstance:IsA("BasePart") and (plotInstance.Name == "PlotFloor" or plotInstance.Name == "Floor") then
+		floor = plotInstance
+	end
+
+	if not floor then
+		warn(("[PlotService] Cannot create TargetDummy: no valid floor part (PrimaryPart or 'PlotFloor') found for Plot %d; skipping dummy generation."):format(plotId))
+		return nil
+	end
+
+	local plotCFrame = floor.CFrame
+	-- Position relative to the plot's CFrame: front of plot (local +Z offset), facing back toward center (math.pi)
+	-- Floor is 30x30; front is at local Z = 11, clear of pedestals (at Z = -5 and 5, X = ±8)
+	local dummyCFrame = plotCFrame * CFrame.new(0, 2.25, 11) * CFrame.Angles(0, math.pi, 0)
+
+	local dummy = Instance.new("Model")
+	dummy.Name = "TargetDummy"
+	dummy:SetAttribute("PlotId", plotId)
+
+	-- Base post/stand
+	local post = Instance.new("Part")
+	post.Name = "Post"
+	post.Size = Vector3.new(0.8, 2.5, 0.8)
+	post.CFrame = dummyCFrame * CFrame.new(0, -0.75, 0)
+	post.Anchored = true
+	post.CanCollide = true
+	post.Material = Enum.Material.Wood
+	post.Color = Color3.fromRGB(120, 80, 45)
+	post.TopSurface = Enum.SurfaceType.Smooth
+	post.BottomSurface = Enum.SurfaceType.Smooth
+	post.Parent = dummy
+
+	-- Straw/burlap torso (PrimaryPart)
+	local torso = Instance.new("Part")
+	torso.Name = "Torso"
+	torso.Size = Vector3.new(2.2, 2.6, 1.4)
+	torso.CFrame = dummyCFrame * CFrame.new(0, 1.0, 0)
+	torso.Anchored = true
+	torso.CanCollide = true
+	torso.Material = Enum.Material.Fabric
+	torso.Color = Color3.fromRGB(205, 175, 130)
+	torso.TopSurface = Enum.SurfaceType.Smooth
+	torso.BottomSurface = Enum.SurfaceType.Smooth
+	torso.Parent = dummy
+	dummy.PrimaryPart = torso
+
+	-- Head
+	local head = Instance.new("Part")
+	head.Name = "Head"
+	head.Size = Vector3.new(1.2, 1.2, 1.2)
+	head.CFrame = dummyCFrame * CFrame.new(0, 2.7, 0)
+	head.Anchored = true
+	head.CanCollide = true
+	head.Material = Enum.Material.Fabric
+	head.Color = Color3.fromRGB(215, 185, 140)
+	head.TopSurface = Enum.SurfaceType.Smooth
+	head.BottomSurface = Enum.SurfaceType.Smooth
+	head.Parent = dummy
+
+	-- Wooden cross arms
+	local crossArms = Instance.new("Part")
+	crossArms.Name = "CrossArms"
+	crossArms.Size = Vector3.new(3.6, 0.6, 0.6)
+	crossArms.CFrame = dummyCFrame * CFrame.new(0, 1.3, 0)
+	crossArms.Anchored = true
+	crossArms.CanCollide = false
+	crossArms.Material = Enum.Material.Wood
+	crossArms.Color = Color3.fromRGB(120, 80, 45)
+	crossArms.TopSurface = Enum.SurfaceType.Smooth
+	crossArms.BottomSurface = Enum.SurfaceType.Smooth
+	crossArms.Parent = dummy
+
+	CollectionService:AddTag(dummy, TARGET_DUMMY_TAG)
+
+	if plotInstance:IsA("Model") then
+		dummy.Parent = plotInstance
+	else
+		dummy.Parent = plotInstance.Parent or workspace
+	end
+
+	return dummy
+end
+
 -- Generates default plot platforms in Workspace ONLY if no Plot-tagged objects exist
 local function generateDefaultPlots()
 	local folder = Instance.new("Folder")
@@ -227,6 +324,9 @@ local function generateDefaultPlots()
 			pedPart.Parent = model
 		end
 
+		-- Target dummy placeholder at front of plot
+		createPlaceholderDummy(model, i)
+
 		CollectionService:AddTag(model, PLOT_TAG)
 	end
 
@@ -262,6 +362,24 @@ local function discoverPlots()
 				end
 				ped:SetAttribute("SlotIndex", slot)
 			end
+		end
+
+		-- Find or create TargetDummy for this plot
+		local dummy: Instance? = nil
+		for _, desc in inst:GetDescendants() do
+			if CollectionService:HasTag(desc, TARGET_DUMMY_TAG) or desc.Name == "TargetDummy" then
+				dummy = desc
+				break
+			end
+		end
+
+		if dummy then
+			dummy:SetAttribute("PlotId", plotId)
+			if not CollectionService:HasTag(dummy, TARGET_DUMMY_TAG) then
+				CollectionService:AddTag(dummy, TARGET_DUMMY_TAG)
+			end
+		else
+			createPlaceholderDummy(inst, plotId)
 		end
 
 		registeredPlots[plotId] = inst

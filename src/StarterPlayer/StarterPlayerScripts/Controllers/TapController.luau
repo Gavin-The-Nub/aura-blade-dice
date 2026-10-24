@@ -8,6 +8,7 @@ local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Remotes = require(Shared:WaitForChild("Remotes"))
 local UI = Shared:WaitForChild("UI")
 local MainHUD = require(UI:WaitForChild("HUD"):WaitForChild("MainHUD"))
+local TargetDummyController = require(script.Parent:WaitForChild("TargetDummyController"))
 
 type MainHUDInstance = MainHUD.MainHUDInstance
 
@@ -68,8 +69,13 @@ function TapController.Init(hud: MainHUDInstance)
 				return
 			end
 			local crit = if type(isCrit) == "boolean" then isCrit else false
-			local spawnPos = lastTapPos or Vector2.new(workspace.CurrentCamera.ViewportSize.X / 2, workspace.CurrentCamera.ViewportSize.Y / 2)
-			hud:SpawnFloatingNumber(spawnPos, goldEarned, crit)
+
+			-- Check if character is near personal target dummy to play 3D reactions instead of 2D HUD number
+			local reacted = TargetDummyController.OnTapResult(goldEarned, crit)
+			if not reacted then
+				local spawnPos = lastTapPos or Vector2.new(workspace.CurrentCamera.ViewportSize.X / 2, workspace.CurrentCamera.ViewportSize.Y / 2)
+				hud:SpawnFloatingNumber(spawnPos, goldEarned, crit)
+			end
 		end)
 	end
 end
