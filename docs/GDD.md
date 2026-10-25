@@ -35,7 +35,7 @@ $$\text{Gold Per Tap} = \text{Sword Base Damage} \times \text{Grade Multiplier} 
 
 ## 3. The 29-Tier Sword Dice Progression Ladder
 
-Players spend Gold at the Dice Merchant to purchase any Dice tier and equip any owned Dice. Tiers can be bought in any order without skipping constraints. Purchasing a Dice tier automatically equips it if it is higher than the currently equipped tier. Players can freely switch between any owned Dice at any time. Each tier provides a substantial boost to base Luck (roughly $2\times$ to $2.5\times$), while Gold costs scale exponentially up through the late-game Octillions ($100\text{Oc}$).
+Players spend Gold at the Dice Merchant to purchase any Dice tier and equip any owned Dice. Tiers can be bought in any order without skipping constraints. Purchasing a Dice tier automatically equips it if it is higher than the currently equipped tier. Players can freely switch between any owned Dice at any time. Luck values follow the Anime Dice table, while Gold costs rise by $4\times$ to $25\times$ per step up through the late-game Octillions ($100\text{Oc}$).
 
 > [!NOTE]
 > **Roll Cooldown:** Dice no longer alter roll cooldown. A uniform roll cooldown is governed globally in `Config/Game.Roll.Cooldown` (baseline 3.0s placeholder). A dedicated Roll Speed upgrade will shorten it in a future progression feature.
@@ -105,12 +105,33 @@ Instead of Base Damage scaling 1:1 with rarity odds, Swords follow a controlled 
 
 ---
 
-## 5. Multiplier Stations (Grades, Enchants & Blessings)
+## 5. Stations & Multipliers (Plaza & Trial Grounds)
 
-Once a player pulls a high-rarity Sword, they can bring it to three specialist stations in the plaza to roll multiplicative buffs onto that specific blade.
+World stations are split into two distinct hubs:
 
-### A. Blade Forging / Grades (Rolled with Gems)
-Players spend **Gems** at the Master Appraiser to roll a Quality Grade onto their Sword, providing a flat multiplier to its Base Damage:
+### A. Main Plaza Stations
+1. **Dice Merchant:**
+   * Players spend Gold to purchase any of the 29 Dice tiers and freely equip any owned Dice. Tiers can be bought in any order without skipping constraints.
+2. **Sell Stall:**
+   * **Sale Price Formula:** The sale price of a sword comes from a Config formula (placeholder, to be confirmed). No static numbers are hardcoded.
+   * **Single Sell:** Sell an individual sword from the inventory for Gold.
+   * **Sell All:** Liquidate all inventory swords in bulk for their total Gold value.
+   * **Safety Rules:** Single sell and Sell All **never touch equipped or placed swords**. Every other sword sells unless the player locked it.
+   * **Sword Lock Feature:** A `locked` flag on each sword, toggled in the inventory, so locked swords cannot be sold and Sell All skips them.
+   * **Sell All Confirmation:** Displays the count of swords being sold and the total Gold payout, and explicitly warns how many of those swords have a Grade or Enchant.
+   * **Auto-Sell Settings:** Configure rarity-based auto-sell rules applied immediately upon rolling.
+3. **Shop (Robux, later):**
+   * Plaza storefront for premium gamepasses, boosts, and developer products.
+
+### B. Trial Grounds Stations (Near the Trials)
+A second station group is located near the Trials for sword enhancement:
+
+#### 1. Master Appraiser (Blade Grades)
+* Rolled with **Gems**, costing **1 Gem per roll**.
+* Each roll replaces the sword's existing Grade.
+* Each sword holds only **one Grade**.
+* Provides a flat multiplier to the sword's Base Damage.
+* **Auto Grade Roll (Free):** The player picks a target Grade; the server rolls continuously until the result is the target Grade or better, Gems run out, or the player stops; it never starts if the sword already has the target Grade or better.
 
 | Grade | Roll Chance | Damage / Gold Multiplier | Visual Badge Color |
 | :--- | :--- | :--- | :--- |
@@ -124,8 +145,8 @@ Players spend **Gems** at the Master Appraiser to roll a Quality Grade onto thei
 | **Z** | $0.14\%$ | $15.0\times$ | Cyan Neon |
 | **Z+** | $0.01\%$ | $30.0\times$ | Prismatic Rainbow |
 
-### B. Sword Enchants (Rolled with Enchant Reroll Tokens)
-Each Sword can hold one **Enchant**. Enchants scale the Sword's **Gold Multiplier**, **Trial/Boss Damage**, and **Swing Speed**:
+#### 2. Enchanter (Sword Enchants)
+Each Sword can hold one **Enchant** (rolled with **Enchant Reroll Tokens**). Enchants scale the Sword's **Gold Multiplier**, **Trial/Boss Damage**, and **Swing Speed**:
 
 | Enchant Name | Roll Chance | Gold & Damage Multiplier | Bonus Passive Effect |
 | :--- | :--- | :--- | :--- |
@@ -139,7 +160,7 @@ Each Sword can hold one **Enchant**. Enchants scale the Sword's **Gold Multiplie
 | **Genesis** | $0.18\%$ | $75.0\times$ | $+50\%$ Swing Speed & $+50\%$ Total Luck |
 | **Singularity** | $0.02\%$ | $150.0\times$ | $2\times$ All Sword Stats & Instant Fever Recovery |
 
-### C. Hilt Blessings (Rolled with Gold)
+#### 3. Runesmith (Hilt Blessings)
 Players can spend **Gold** at the Runesmith to roll a utility **Hilt Blessing** onto any Sword. Blessings remain active whether the Sword is held in your hand OR placed on a Plot Pedestal:
 * **Fortune I / II / III:** $+5\% / +12\% / +25\%$ Global Roll Luck.
 * **Greed I / II / III:** $+10\% / +25\% / +50\%$ Global Gold Earned.
@@ -153,7 +174,7 @@ Players can spend **Gold** at the Runesmith to roll a utility **Hilt Blessing** 
 
 Each server houses 6 to 8 personal **Player Forge Plots** ringing the main plaza.
 * **Active Main Hand (Tap Income):** The player equips their #1 strongest Sword in their hand to actively tap and slash for full Gold value.
-* **Sword Pedestals (Passive & Offline Income):** Each plot starts with **4 Sword Pedestals** (expandable up to 10 via Rebirths and Gamepasses). Players place their backup Swords onto these pedestals.
+* **Sword Pedestals (Passive & Offline Income):** Each plot starts with **4 Sword Pedestals** and has a hard cap of **11 Pedestals** (4 start, Rebirths 3, 5, 7, 9, and 10 give +1 each, VIP Forge +2). Each plot physically has **11 pedestal models**, locked until earned. Players place their backup Swords onto unlocked pedestals.
 * **Passive Payout Rate:** Every Sword placed on a Plot Pedestal radiates its Aura upward and automatically generates **50% of its Gold-Per-Tap value every second** (including Offline Gold accumulation while the player is logged out).
 * **Personal Plot Target Dummy:** Positioned at the front of each plot so players can slash an interactive target with damage numbers and hit-sparks right at home.
 
@@ -163,9 +184,10 @@ Each server houses 6 to 8 personal **Player Forge Plots** ringing the main plaza
 
 Once a player accumulates enough Gold, they can trigger a **Rebirth** to permanently accelerate their account progression.
 
-* **What Resets:** Current Gold balance, equipped Dice tier (`DiceTier` resets to 1 / *Basic Dice*), and all owned Dice tiers (`OwnedDice` resets back to only Tier 1 Basic Dice).
-* **What Stays:** All rolled **Swords** (including Grades, Enchants, and Blessings), **Gems**, **Enchant Rerolls**, **Potions**, and **Unlocked Pedestal Slots** are permanently kept.
-* **Rebirth Scaling Table (First 10 Rebirths):**
+* **What Resets:** Current Gold balance only.
+* **What Stays:** Dice (`DiceTier` and `OwnedDice`), rolled **Swords** (including Grades, Enchants, and Blessings), **Gems**, **Enchant Reroll Tokens**, **Potions**, and unlocked **Pedestal Slots** are permanently kept. (Rebirth never resets Dice).
+* **Rebirth Scaling Table (First 10 Rebirths):**  
+  *(Note: Rebirth multipliers and costs below are to be verified against Anime Dice until confirmed.)*
 
 | Rebirth Level | Gold Cost | Permanent Gold Multiplier | Permanent Luck Multiplier | Bonus Reward |
 | :--- | :--- | :--- | :--- | :--- |
@@ -200,7 +222,7 @@ Every 20 minutes, the server shifts into a 5-minute **Dimensional Surge Event**:
 
 ## 9. Monetization & Gamepasses
 
-* **Free-to-Play Baseline:** Standard **Auto-Roll**, **Auto-Tap**, and **Auto-Sell** filters are 100% free so all players can grind and AFK comfortably.
+* **Free-to-Play Baseline:** Standard **Auto-Roll**, **Auto-Tap**, **Auto-Sell**, and **Auto Grade Roll** features are 100% free so all players can grind and AFK comfortably.
 * **Premium Gamepasses:**
   * **Fast Slash ($199\text{ Robux}$):** $2\times$ Tapping/Swing speed and $2\times$ Fever Bar charge rate.
   * **Multi-Roll ($299\text{ Robux}$):** Roll 3 Dice simultaneously on every cooldown.

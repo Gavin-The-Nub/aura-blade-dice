@@ -10,7 +10,7 @@
 
 ## 2. MVP scope (build only this unless I say otherwise)
 
-In: tap to earn Gold, crits, Fever, Auto-Tap, Dice rolling (Luck), Swords, equip, Dice Merchant, plot pedestals (passive and offline Gold), personal target dummy, Grades, Enchants, Hilt Blessings, Rebirth, Dummy Trials, server events, gamepasses.
+In: tap to earn Gold, crits, Fever, Auto-Tap, Dice rolling (global cooldown, Luck ladder), Swords, equip & Equip Best, sword Lock, stations (Plaza: Dice Merchant, Sell stall, Shop [Robux, later]; near Trials: Master Appraiser, Enchanter, Runesmith), Auto Grade Roll, plot pedestals (cap 11: 4 start, Rebirths 3/5/7/9/10 +1, VIP Forge +2; passive and offline Gold), personal target dummy, Grades (1 Gem per roll), Enchants, Hilt Blessings, Rebirth (resets Gold only; Dice, swords, Gems, Tokens, Potions, pedestal slots kept; costs/multipliers to be verified against Anime Dice), Dummy Trials, server events, gamepasses, economy simulation.
 
 Out (do NOT build): Relic Accessories (removed), splash damage (removed, there is only ever one target), wave or knight combat (replaced by single-dummy Trials), fancy cutscenes. Use simple placeholder effects for auras until I ask for polish.
 
@@ -41,18 +41,20 @@ Out (do NOT build): Relic Accessories (removed), splash damage (removed, there i
 
 ```
 ReplicatedStorage/
-  Config/        -- Dice, Swords, Grades, Enchants, Blessings, Rebirths, Trials, Events
-  Shared/        -- NumberFormat, Theme, WeightedRandom, small shared helpers
-    UI/          -- Reusable UI components (Button, Panel, Popup) and Screen layouts (HUD)
-  Remotes/       -- RemoteEvents and RemoteFunctions
+  Config/        -- Assets, DataTemplate, Dice, Game, Grades, Swords; Enchants/Blessings/Rebirths/Trials/Events (planned)
+  Shared/        -- NumberFormat, Remotes, Theme; WeightedRandom (planned)
+    UI/          -- InventoryUI, MerchantUI, OfflineIncomePopup, SwordSelectorPopup
+      Components/-- Button, Panel, Popup
+      HUD/       -- MainHUD
 ServerScriptService/
-  Services/      -- DataService, TapService, RollService, PlotService, RebirthService, TrialService, EventService
   Main (Script)  -- starts all services
-  PlayerActionLock (ModuleScript) -- lives at ServerScriptService/PlayerActionLock on purpose (not in Services/, so Main doesn't try to Start it)
+  PlayerActionLock (ModuleScript) -- lives at ServerScriptService/PlayerActionLock (not in Services/)
+  Services/      -- DataService, DevCommands, InventoryService (Equip, Equip Best, Sell; Sell All [planned], Lock [planned]), MerchantService, PlotService, RollService, TapService; RebirthService (planned), TrialService (planned), EventService (planned)
 StarterPlayer/
   StarterPlayerScripts/
-    Controllers/ -- UI and input controllers
-StarterGui/      -- ScreenGuis
+    Controllers/ -- DevFeedback, HUDController, InventoryController, MerchantController, PlotController, RollController, TapController, TargetDummyController
+Workspace/       -- World map & interaction zones: Personal Plots (Dummies, Pedestals), Stations (Plaza: Dice Merchant; Sell Stall [planned], Shop [planned]; Near Trials: Master Appraiser [planned], Enchanter [planned], Runesmith [planned])
+Tools/Scripts/   -- Economy simulation & testing scripts (planned)
 ```
 
 **Script Sync Rule:** Only create folders inside folders that are already synced (`Config`, `Shared`, `Services`, `Controllers`). If you ever need a new top-level folder, ask the user first so they can link it with Script Sync.
@@ -61,12 +63,15 @@ If you want to change this structure, ask me first.
 ## 6. Game math (from the GDD, implement exactly)
 
 - **Luck:** `Total Luck = Dice Base Luck × Rebirth Luck × Enchant Luck × Potion/Server boosts`
-- **Roll odds:** `Effective Odds = max(1, Sword Base Odds / Total Luck)`
+- **Roll odds & Cooldown:** `Effective Odds = max(1, Sword Base Odds / Total Luck)`. Roll cooldown is **global** (`Config/Game.Roll.Cooldown`, baseline 3.0s placeholder), not per Dice.
+- **Dice Ladder:** 29-tier progression table (Basic Dice up to Zenith Dice). Players can purchase any tier with Gold in any order and switch/equip any owned Dice tier at will.
 - **Gold per tap:** `Base Damage × Grade × Enchant × Rebirth × Crit`
 - **Crit:** 10% base chance, 2.5× Gold.
 - **Fever:** each tap adds 1 point to a 100-point meter. At 100 it triggers a 15-second mode with 2× swing speed, 100% crit, and +50% Luck.
-- **Pedestal passive income:** each pedestal Sword gives 50% of its Gold-per-tap value every second, including offline time.
-- **Dice Progression & Rebirth:** Players can purchase any Dice tier with Gold out of order and switch/equip any owned Dice tier. Upon Rebirth, all unlocked/owned Dice reset back to Tier 1 Basic Dice (`OwnedDice = { ["1"] = true }`, `DiceTier = 1`), and current Gold balance resets.
+- **Pedestal passive income:** each pedestal Sword gives 50% of its Gold-per-tap value every second, including offline time (capped at 8 hours). Hard cap of **11 pedestals** per plot (4 starting, +1 each at Rebirths 3, 5, 7, 9, and 10, and +2 from VIP Forge). Each plot physically has 11 pedestal models, locked until earned.
+- **Grades & Auto Grade Roll:** Rolled with Gems at Master Appraiser (near Trials), costing **1 Gem per roll**. A roll replaces the sword's Grade (one Grade per sword). Free **Auto Grade Roll**: player picks a target Grade; server rolls until result is target or better, Gems run out, or player stops; never starts if sword already has target or better.
+- **Selling & Lock:** Single sell and Sell All **never touch equipped or placed swords**. Every other sword sells unless the player locked it. Sword **Lock** is a boolean flag on each sword toggled in the inventory, preventing single sell and causing Sell All to skip it. Sell All confirmation dialog shows sword count and total Gold payout, and warns how many of those swords have a Grade or Enchant.
+- **Rebirth:** Rebirth resets **Gold only**. Dice (`DiceTier` and `OwnedDice`), swords, Gems, Tokens, Potions, and pedestal slots are **permanently kept**. Rebirth multipliers and costs are marked *to be verified against Anime Dice* until confirmed. Old text saying Rebirth resets Dice is obsolete and removed.
 
 When the GDD has a table, copy it into the matching Config module faithfully.
 
@@ -91,3 +96,9 @@ Costs reach Septillion scale. Use normal Luau numbers (doubles). Always display 
 - [ ] No errors or warnings in Output
 - [ ] Numbers come from Config, not hardcoded
 - [ ] I have a test checklist and a commit message
+
+## 10. Known open issues
+
+- **Dual Wielding:** Needs two equipped swords, but the codebase and player data model currently assume a single `EquippedSword`.
+- **Rebirth Multipliers & Costs:** Multipliers and Gold costs in Config and GDD are unverified placeholders until confirmed against Anime Dice.
+- **Sword List Content:** The sword list in `Config/Swords` is too short for the high-Luck dice (players with top-tier dice will roll beyond the highest-rarity swords currently defined).
