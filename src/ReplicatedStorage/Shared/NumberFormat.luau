@@ -14,6 +14,7 @@ local SUFFIXES: { { name: string, value: number } } = {
 	{ name = "Qi", value = 1e18 },
 	{ name = "Sx", value = 1e21 },
 	{ name = "Sp", value = 1e24 },
+	{ name = "Oc", value = 1e27 },
 }
 
 local MAX_DECIMALS = 2

@@ -97,8 +97,7 @@ function RollService.Roll(player: Player, isAuto: boolean): (boolean, Swords.Swo
 		return false, nil, "Data is loading..."
 	end
 
-	local diceDef = getPlayerDice(player)
-	local cooldown = diceDef.rollCooldown or 3.0
+	local cooldown = GameConfig.Roll.Cooldown
 	local now = os.clock()
 	local lastTime = lastRollTime[player] or 0
 
@@ -186,9 +185,7 @@ local function startAutoRoll(player: Player)
 				break
 			end
 
-			local diceDef = getPlayerDice(player)
-			local cd = diceDef.rollCooldown or 3.0
-			task.wait(cd)
+			task.wait(GameConfig.Roll.Cooldown)
 		end
 	end)
 end

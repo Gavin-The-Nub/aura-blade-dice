@@ -145,7 +145,7 @@ local function onDiceCommand(originTextSource: TextSource, unfilteredText: strin
 	DataService.Set(player, "OwnedDice", updatedOwned)
 	local ok = DataService.Set(player, "DiceTier", tier)
 	if ok then
-		say(player, ("Dice set to Tier %d (%s | Luck: %sx | CD: %.1fs). Tiers 1..%d marked owned."):format(tier, targetDef.name, tostring(targetDef.baseLuck), targetDef.rollCooldown, tier))
+		say(player, ("Dice set to Tier %d (%s | Luck: %sx). Tiers 1..%d marked owned."):format(tier, targetDef.name, NumberFormat.format(targetDef.baseLuck), tier))
 	else
 		say(player, "/dice rejected (data not loaded yet, or invalid value)")
 	end

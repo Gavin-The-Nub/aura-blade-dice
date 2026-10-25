@@ -17,6 +17,9 @@ local Game = {
 		CritChance = 1.0, -- 100% crit chance during Fever Mode
 		LuckMultiplier = 1.5, -- +50% Total Luck
 	},
+	Roll = {
+		Cooldown = 3.0, -- placeholder roll cooldown in seconds; shortened by future Roll Speed upgrade
+	},
 	AutoTap = {
 		BaseTapsPerSecond = 10, -- Base auto-tap rate (matches MaxTapsPerSecond)
 	},

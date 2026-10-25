@@ -14,6 +14,7 @@ local ServerScriptService = game:GetService("ServerScriptService")
 
 local DataTemplate = require(ReplicatedStorage.Config.DataTemplate)
 local GameConfig = require(ReplicatedStorage.Config.Game)
+local Dice = require(ReplicatedStorage.Config.Dice)
 local Remotes = require(ReplicatedStorage.Shared.Remotes)
 local ProfileStore = require(ServerScriptService.Vendor.ProfileStore) :: any
 
@@ -120,20 +121,26 @@ local function onPlayerAdded(player: Player)
 
 	profile:Reconcile() -- add any template fields this old profile is missing
 
-	-- Migrate OwnedDice: ensure set exists and marks tiers 1..DiceTier as owned
-	if type(profile.Data.OwnedDice) ~= "table" then
+	-- Validate and clamp DiceTier between 1 and #Dice (preserving valid owned/equipped tiers)
+	local equipped = profile.Data.DiceTier
+	if type(equipped) ~= "number" or equipped < 1 then
+		equipped = 1
+	elseif equipped > #Dice then
+		equipped = #Dice
+	else
+		equipped = math.floor(equipped)
+	end
+	profile.Data.DiceTier = equipped
+
+	-- Migrate OwnedDice: mark tiers 1..DiceTier as owned ONLY when missing or empty (old profiles)
+	if type(profile.Data.OwnedDice) ~= "table" or next(profile.Data.OwnedDice) == nil then
 		local copy = {}
-		local equipped = profile.Data.DiceTier or 1
 		for t = 1, equipped do
 			copy[tostring(t)] = true
 		end
 		copy["1"] = true
 		profile.Data.OwnedDice = copy
 	else
-		local equipped = profile.Data.DiceTier or 1
-		for t = 1, equipped do
-			profile.Data.OwnedDice[tostring(t)] = true
-		end
 		profile.Data.OwnedDice["1"] = true
 	end
 
@@ -336,6 +343,11 @@ function DataService.Set(player: Player, key: string, value: any): boolean
 		if key == "Gold" then
 			value = math.floor(value + 0.5)
 		end
+		if key == "DiceTier" then
+			if value < 1 or value > #Dice or value ~= math.floor(value) then
+				return false
+			end
+		end
 	end
 	profile.Data[key] = value
 	changedEvent:Fire(player, key, value)
@@ -379,6 +391,11 @@ function DataService.SetMany(player: Player, updates: { [string]: any }): boolea
 			end
 			if key == "Gold" then
 				value = math.floor(value + 0.5)
+			end
+			if key == "DiceTier" then
+				if value < 1 or value > #Dice or value ~= math.floor(value) then
+					return false
+				end
 			end
 		end
 		sanitized[key] = value

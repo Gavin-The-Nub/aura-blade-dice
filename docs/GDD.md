@@ -1,7 +1,7 @@
 # ⚔️ Aura Blade RNG — Game Design Document (GDD)
 
 **Genre:** RNG Collector / Clicker & Plot Simulator Hybrid  
-**Core Concept:** Roll through a 25-tier Dice progression ladder to pull rare Swords that radiate full-body Auras around both the blade and the player. Tap to swing your equipped Sword to earn Gold, place backup Swords on your plot for passive income, and scale your stats through Grades, Blade Enchants, and Rebirths.
+**Core Concept:** Roll through a 29-tier Dice progression ladder to pull rare Swords that radiate full-body Auras around both the blade and the player. Tap to swing your equipped Sword to earn Gold, place backup Swords on your plot for passive income, and scale your stats through Grades, Blade Enchants, and Rebirths.
 
 ---
 
@@ -24,7 +24,7 @@ $$\text{Total Luck} = (\text{Dice Base Luck} \times \text{Rebirth Luck Multiplie
 $$\text{Effective Roll Odds} = \max\left(1, \frac{\text{Sword Base Odds}}{\text{Total Luck}}\right)$$
 
 ### B. Gold Per Tap Formula (Soft-Scaled Curve)
-To ensure balanced progression across 25+ tiers without allowing a single lucky early roll to skip the entire game, Sword Base Damage scales smoothly alongside multiplicative stations:
+To ensure balanced progression across 29 tiers without allowing a single lucky early roll to skip the entire game, Sword Base Damage scales smoothly alongside multiplicative stations:
 
 $$\text{Gold Per Tap} = \text{Sword Base Damage} \times \text{Grade Multiplier} \times \text{Enchant Multiplier} \times \text{Rebirth Multiplier} \times \text{Crit Bonus}$$
 
@@ -33,37 +33,44 @@ $$\text{Gold Per Tap} = \text{Sword Base Damage} \times \text{Grade Multiplier} 
 
 ---
 
-## 3. The 25-Tier Sword Dice Progression Ladder
+## 3. The 29-Tier Sword Dice Progression Ladder
 
-Players spend Gold at the Dice Merchant to purchase any Dice tier and equip any owned Dice. Tiers can be bought in any order without skipping constraints. Purchasing a Dice tier automatically equips it if it is higher than the currently equipped tier. Players can freely switch between any owned Dice at any time. Each tier roughly doubles to triples the player's base Luck while increasing in Gold cost by $4\times$ to $8\times$ per step.
+Players spend Gold at the Dice Merchant to purchase any Dice tier and equip any owned Dice. Tiers can be bought in any order without skipping constraints. Purchasing a Dice tier automatically equips it if it is higher than the currently equipped tier. Players can freely switch between any owned Dice at any time. Each tier provides a substantial boost to base Luck (roughly $2\times$ to $2.5\times$), while Gold costs scale exponentially up through the late-game Octillions ($100\text{Oc}$).
 
-| Tier | Dice Name | Gold Cost | Base Luck | Roll Cooldown | Visual Theme |
-| :--- | :--- | :--- | :--- | :--- | :--- |
-| **1** | **Basic Dice** | Free | $1\times$ | 3.0s | Simple carved wood with iron pips |
-| **2** | **Ember Dice** | $2,500$ | $5\times$ | 2.9s | Charred obsidian with glowing orange cracks |
-| **3** | **Tide Dice** | $10,000$ | $10\times$ | 2.9s | Translucent ocean blue with bubble particles |
-| **4** | **Verdant Dice** | $75,000$ | $20\times$ | 2.8s | Mossy ancient stone wrapped in vines |
-| **5** | **Volt Dice** | $500,000$ | $42\times$ | 2.8s | Crackling yellow-blue storm core |
-| **6** | **Glacier Dice** | $4\text{M}$ | $100\times$ | 2.7s | Frosted diamond cube emitting cold mist |
-| **7** | **Magma Dice** | $30\text{M}$ | $200\times$ | 2.7s | Molten lava rock dripping fire |
-| **8** | **Gale Dice** | $200\text{M}$ | $450\times$ | 2.6s | Swirling emerald wind vortex |
-| **9** | **Sandstorm Dice** | $1.5\text{B}$ | $1,000\times$ | 2.6s | Golden sandstone with orbiting dust runes |
-| **10** | **Phantom Dice** | $12\text{B}$ | $2,250\times$ | 2.5s | Ghostly purple spectral cube |
-| **11** | **Bloodforged Dice** | $100\text{B}$ | $5,000\times$ | 2.4s | Crimson steel with floating red crystals |
-| **12** | **Solaris Dice** | $850\text{B}$ | $12,000\times$ | 2.4s | Blazing miniature sun with solar flares |
-| **13** | **Lunaris Dice** | $7.5\text{T}$ | $28,000\times$ | 2.3s | Silver crescent filigree and starlight |
-| **14** | **Gravity Dice** | $65\text{T}$ | $65,000\times$ | 2.2s | Floating purple rings crushing inward |
-| **15** | **Venomspire Dice** | $600\text{T}$ | $150,000\times$ | 2.2s | Neon acid green with toxic vapor |
-| **16** | **Cybernetic Dice** | $5\text{Qa}$ | $350,000\times$ | 2.1s | Holographic wireframe with digital glitches |
-| **17** | **Dragonheart Dice** | $45\text{Qa}$ | $850,000\times$ | 2.0s | Scaled ruby core pulsing like a heartbeat |
-| **18** | **Runic Dice** | $400\text{Qa}$ | $2\text{M}\times$ | 1.9s | Floating celestial tablets with ancient glyphs |
-| **19** | **Nebula Dice** | $3.5\text{Qi}$ | $5\text{M}\times$ | 1.9s | Deep space cloud with birthing stars |
-| **20** | **Chronos Dice** | $30\text{Qi}$ | $12.5\text{M}\times$ | 1.8s | Interlocking golden clockwork gears |
-| **21** | **Abyssal Dice** | $250\text{Qi}$ | $32\text{M}\times$ | 1.7s | Dark matter cube devouring nearby light |
-| **22** | **Seraphic Dice** | $2.5\text{Sx}$ | $80\text{M}\times$ | 1.6s | Six golden wings wrapped around a halo core |
-| **23** | **Dimension Dice** | $25\text{Sx}$ | $220\text{M}\times$ | 1.5s | Shattered glass portal showing parallel worlds |
-| **24** | **Singularity Dice** | $250\text{Sx}$ | $650\text{M}\times$ | 1.4s | Event horizon orb with relativistic jets |
-| **25** | **Omniversal Dice** | $5\text{Sp}$ | $2.5\text{B}\times$ | 1.2s | Chromatic shifting reality cube |
+> [!NOTE]
+> **Roll Cooldown:** Dice no longer alter roll cooldown. A uniform roll cooldown is governed globally in `Config/Game.Roll.Cooldown` (baseline 3.0s placeholder). A dedicated Roll Speed upgrade will shorten it in a future progression feature.
+
+| Tier | Dice Name | Gold Cost | Base Luck | Visual Theme |
+| :--- | :--- | :--- | :--- | :--- |
+| **1** | **Basic Dice** | Free | $1\times$ | Simple carved wood with iron pips |
+| **2** | **Ember Dice** | $2,500$ | $5\times$ | Charred obsidian with glowing orange cracks |
+| **3** | **Tide Dice** | $10,000$ | $10\times$ | Translucent ocean blue with bubble particles |
+| **4** | **Verdant Dice** | $75,000$ | $20\times$ | Mossy ancient stone wrapped in vines |
+| **5** | **Volt Dice** | $500,000$ | $42\times$ | Crackling yellow-blue storm core |
+| **6** | **Glacier Dice** | $4\text{M}$ | $100\times$ | Frosted diamond cube emitting cold mist |
+| **7** | **Magma Dice** | $30\text{M}$ | $200\times$ | Molten lava rock dripping fire |
+| **8** | **Gale Dice** | $200\text{M}$ | $400\times$ | Swirling emerald wind vortex |
+| **9** | **Sandstorm Dice** | $1.5\text{B}$ | $750\times$ | Golden sandstone with orbiting dust runes |
+| **10** | **Phantom Dice** | $12\text{B}$ | $1,500\times$ | Ghostly purple spectral cube |
+| **11** | **Bloodforged Dice** | $100\text{B}$ | $3,000\times$ | Crimson steel with floating red crystals |
+| **12** | **Solaris Dice** | $750\text{B}$ | $6,000\times$ | Blazing miniature sun with solar flares |
+| **13** | **Lunaris Dice** | $5\text{T}$ | $12,500\times$ | Silver crescent filigree and starlight |
+| **14** | **Gravity Dice** | $37\text{T}$ | $25,000\times$ | Floating purple rings crushing inward |
+| **15** | **Venomspire Dice** | $150\text{T}$ | $50,000\times$ | Neon acid green with toxic vapor |
+| **16** | **Cybernetic Dice** | $1\text{Qa}$ | $100,000\times$ | Holographic wireframe with digital glitches |
+| **17** | **Dragonheart Dice** | $8.5\text{Qa}$ | $200,000\times$ | Scaled ruby core pulsing like a heartbeat |
+| **18** | **Runic Dice** | $100\text{Qa}$ | $400,000\times$ | Floating celestial tablets with ancient glyphs |
+| **19** | **Nebula Dice** | $1\text{Qi}$ | $1\text{M}\times$ | Deep space cloud with birthing stars |
+| **20** | **Chronos Dice** | $12\text{Qi}$ | $2\text{M}\times$ | Interlocking golden clockwork gears |
+| **21** | **Abyssal Dice** | $150\text{Qi}$ | $5\text{M}\times$ | Dark matter cube devouring nearby light |
+| **22** | **Seraphic Dice** | $1\text{Sx}$ | $10\text{M}\times$ | Six golden wings wrapped around a halo core |
+| **23** | **Dimension Dice** | $15\text{Sx}$ | $25\text{M}\times$ | Shattered glass portal showing parallel worlds |
+| **24** | **Singularity Dice** | $100\text{Sx}$ | $62.5\text{M}\times$ | Event horizon orb with relativistic jets |
+| **25** | **Omniversal Dice** | $750\text{Sx}$ | $150\text{M}\times$ | Chromatic shifting reality cube |
+| **26** | **Astral Dice** | $10\text{Sp}$ | $375\text{M}\times$ | Primordial cosmic dust and shifting stellar nebulae |
+| **27** | **Eternal Dice** | $250\text{Sp}$ | $950\text{M}\times$ | Infinite starlight loops and timeless crystalline prisms |
+| **28** | **Infinity Dice** | $5\text{Oc}$ | $2\text{B}\times$ | Event horizon singularities and reality distortion rings |
+| **29** | **Zenith Dice** | $100\text{Oc}$ | $5\text{B}\times$ | Prismatic aura halos, crowned reality blades, and transcendent godlight |
 
 ---
 

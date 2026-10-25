@@ -1,6 +1,6 @@
 --!strict
 -- MerchantUI: Modal dialog for the Dice Merchant.
--- Displays Dice tiers 1 to 10 with name, cost, Luck multiplier, and roll cooldown.
+-- Displays all configured Dice tiers with name, cost, and Luck multiplier.
 -- Follows strict card states: Equipped / Owned (Equip button) / Buy (cost, disabled if unaffordable).
 -- No Locked state: any tier can be bought or equipped if owned.
 
@@ -178,7 +178,7 @@ function MerchantUI.new(parentGui: Instance): MerchantUIInstance
 		statsLabel.TextSize = 12
 		statsLabel.TextColor3 = Theme.Colors.TextSecondary
 		statsLabel.TextXAlignment = Enum.TextXAlignment.Left
-		statsLabel.Text = ("%sx Luck  •  %.1fs CD  •  %s"):format(NumberFormat.format(def.baseLuck), def.rollCooldown, formatCost(def.cost))
+		statsLabel.Text = ("%sx Luck  •  %s"):format(NumberFormat.format(def.baseLuck), formatCost(def.cost))
 		statsLabel.Parent = infoContainer
 
 		-- Right action container
