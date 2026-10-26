@@ -12,6 +12,7 @@ local Swords = require(ReplicatedStorage.Config.Swords)
 local Dice = require(ReplicatedStorage.Config.Dice)
 local Remotes = require(ReplicatedStorage.Shared.Remotes)
 
+local SalePrice = require(ReplicatedStorage.Shared.SalePrice)
 local DataService = require(ServerScriptService.Services.DataService)
 local TapService = require(ServerScriptService.Services.TapService)
 
@@ -117,6 +118,8 @@ function RollService.Roll(player: Player, isAuto: boolean): (boolean, Swords.Swo
 
 	if isAutoSold then
 		lastRollTime[player] = now
+		local salePrice = SalePrice.calculate(wonSword)
+		DataService.Increment(player, "Gold", salePrice)
 		return true, wonSword, nil, true
 	end
 
@@ -134,10 +137,11 @@ function RollService.Roll(player: Player, isAuto: boolean): (boolean, Swords.Swo
 	-- Update cooldown timestamp
 	lastRollTime[player] = now
 
-	-- Add to player inventory {uid = <unique id>, id = <sword id>}
+	-- Add to player inventory {uid = <unique id>, id = <sword id>, locked = false}
 	local newEntry = {
 		uid = HttpService:GenerateGUID(false),
 		id = wonSword.id,
+		locked = false,
 	}
 
 	local updatedSwords = table.clone(ownedSwords)

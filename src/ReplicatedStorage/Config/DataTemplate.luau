@@ -3,12 +3,20 @@
 -- DataService hands this to ProfileStore; fields added here later are filled into
 -- existing saved profiles automatically via Profile:Reconcile().
 
+export type OwnedSwordData = {
+	uid: string,
+	id: string,
+	locked: boolean?,
+	grade: string?,
+	enchant: string?,
+}
+
 export type PlayerData = {
 	Version: number, -- bump + migrate if the shape ever changes incompatibly
 	Gold: number,
 	Gems: number,
 	Rebirths: number,
-	OwnedSwords: { any }, -- sword entries are defined by a later feature
+	OwnedSwords: { OwnedSwordData }, -- sword entries with uid, id, and locked flag
 	EquippedSword: string, -- uid of equipped sword, or "" for nothing equipped
 	DiceTier: number, -- equipped Dice tier, 1 = Basic Dice
 	OwnedDice: { [string]: boolean }, -- set of owned tiers ("1", "2", ...)

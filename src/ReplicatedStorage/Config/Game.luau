@@ -39,6 +39,12 @@ local Game = {
 		MaxFloatingNumbers = 6, -- Cap of active 3D floating damage numbers
 		SparkThrottle = 0.1, -- Minimum seconds between particle spark bursts
 	},
+	Selling = {
+		-- Placeholder sword sale price formula:
+		-- SalePrice = math.max(1, math.floor(baseDamage * BaseDamageMultiplier * gradeMultiplier * enchantMultiplier + 0.5))
+		-- Placeholder value to be tuned against EconSim progression pacing.
+		BaseDamageMultiplier = 10,
+	},
 }
 
 return Game

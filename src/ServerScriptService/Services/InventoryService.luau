@@ -2,6 +2,7 @@
 -- InventoryService: Server-authoritative inventory operations (Equip, Sell, Auto-Sell Rules).
 -- Validates ownership, argument types, rate limits, and persists updates via DataService.
 
+local HttpService = game:GetService("HttpService")
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local ServerScriptService = game:GetService("ServerScriptService")
@@ -9,6 +10,7 @@ local ServerScriptService = game:GetService("ServerScriptService")
 local Swords = require(ReplicatedStorage.Config.Swords)
 local GameConfig = require(ReplicatedStorage.Config.Game)
 local Remotes = require(ReplicatedStorage.Shared.Remotes)
+local SalePrice = require(ReplicatedStorage.Shared.SalePrice)
 local DataService = require(ServerScriptService.Services.DataService)
 local TapService = require(ServerScriptService.Services.TapService)
 local PlayerActionLock = require(ServerScriptService.PlayerActionLock)
@@ -136,7 +138,75 @@ function InventoryService.Unequip(player: Player): (boolean, string?)
 	return InventoryService.Equip(player, "")
 end
 
--- Sells (removes) a sword by its uid. Equipped swords and pedestal swords cannot be sold.
+-- Central server formula for calculating sword sale price (delegates to Shared/SalePrice)
+function InventoryService.CalculateSwordSalePrice(swordEntryOrDef: any): number
+	return SalePrice.calculate(swordEntryOrDef)
+end
+
+-- Toggles the locked status of an owned sword by its uid.
+-- Locked swords can be equipped and placed on pedestals, but cannot be sold.
+function InventoryService.ToggleLock(player: Player, uid: string): (boolean, boolean?, string?)
+	if not checkRateLimit(player) then
+		return false, nil, "Action rate limited. Please slow down."
+	end
+
+	if typeof(uid) ~= "string" or #uid > 100 or uid == "" then
+		return false, nil, "Invalid sword identifier."
+	end
+
+	if not DataService.IsLoaded(player) then
+		return false, nil, "Data is loading..."
+	end
+
+	if not PlayerActionLock.Acquire(player) then
+		return false, nil, "Another inventory or pedestal action is in progress."
+	end
+
+	local ok, success, isLocked, errMsg = pcall(function(): (boolean, boolean?, string?)
+		local ownedSwords = DataService.Get(player, "OwnedSwords")
+		if typeof(ownedSwords) ~= "table" then
+			return false, nil, "No swords owned."
+		end
+
+		local targetIndex = nil
+		local targetEntry = nil
+		for i, entry in ipairs(ownedSwords) do
+			if typeof(entry) == "table" and entry.uid == uid then
+				targetIndex = i
+				targetEntry = entry
+				break
+			end
+		end
+
+		if not targetIndex or not targetEntry then
+			return false, nil, "You do not own this sword."
+		end
+
+		local updated = table.clone(ownedSwords)
+		local newEntry = table.clone(targetEntry)
+		newEntry.locked = not (targetEntry.locked == true)
+		updated[targetIndex] = newEntry
+
+		local saved = DataService.Set(player, "OwnedSwords", updated)
+		if saved then
+			return true, newEntry.locked, nil
+		else
+			return false, nil, "Failed to update sword lock status."
+		end
+	end)
+
+	PlayerActionLock.Release(player)
+
+	if not ok then
+		warn(("[InventoryService.ToggleLock] Error for %s: %s"):format(player.Name, tostring(success)))
+		return false, nil, "An unexpected error occurred while toggling sword lock."
+	end
+
+	return success, isLocked, errMsg
+end
+
+-- Sells (removes) a sword by its uid. Equipped swords, pedestal swords, and locked swords cannot be sold.
+-- Awards Gold atomically via DataService.SetMany.
 function InventoryService.Sell(player: Player, uid: string): (boolean, string?)
 	if not checkRateLimit(player) then
 		return false, "Action rate limited. Please slow down."
@@ -176,20 +246,38 @@ function InventoryService.Sell(player: Player, uid: string): (boolean, string?)
 		end
 
 		local targetIndex = nil
+		local targetEntry = nil
 		for i, entry in ipairs(ownedSwords) do
 			if typeof(entry) == "table" and entry.uid == uid then
 				targetIndex = i
+				targetEntry = entry
 				break
 			end
 		end
 
-		if not targetIndex then
+		if not targetIndex or not targetEntry then
 			return false, "You do not own this sword."
 		end
 
+		if targetEntry.locked == true then
+			return false, "Cannot sell a locked sword! Unlock it first."
+		end
+
+		local salePrice = InventoryService.CalculateSwordSalePrice(targetEntry)
+		local currentGold = DataService.Get(player, "Gold") or 0
+		if typeof(currentGold) ~= "number" then
+			currentGold = 0
+		end
+		local newGold = math.floor(currentGold + salePrice + 0.5)
+
 		local updated = table.clone(ownedSwords)
 		table.remove(updated, targetIndex)
-		local saved = DataService.Set(player, "OwnedSwords", updated)
+
+		-- Atomic write of OwnedSwords and Gold in one non-yielding block
+		local saved = DataService.SetMany(player, {
+			OwnedSwords = updated,
+			Gold = newGold,
+		})
 		if saved then
 			return true, nil
 		else
@@ -205,6 +293,184 @@ function InventoryService.Sell(player: Player, uid: string): (boolean, string?)
 	end
 
 	return success, errMsg
+end
+
+type SellSnapshot = {
+	token: string,
+	createdAt: number,
+	uids: { string },
+}
+
+local sellSnapshots: { [Player]: SellSnapshot } = {}
+
+-- Previews Sell All: collects eligible swords (not equipped, not placed, not locked)
+-- and saves a server snapshot that expires after 60 seconds.
+function InventoryService.GetSellAllPreview(player: Player): (boolean, any?, string?)
+	if not checkRateLimit(player) then
+		return false, nil, "Action rate limited. Please slow down."
+	end
+
+	if not DataService.IsLoaded(player) then
+		return false, nil, "Data is loading..."
+	end
+
+	local ok, success, data, errMsg = pcall(function(): (boolean, any?, string?)
+		local ownedSwords = DataService.Get(player, "OwnedSwords")
+		local equippedUid = DataService.Get(player, "EquippedSword")
+		local placedSwords = DataService.Get(player, "PlacedSwords")
+
+		local placedMap: { [string]: boolean } = {}
+		if typeof(placedSwords) == "table" then
+			for _, pUid in placedSwords do
+				if typeof(pUid) == "string" and pUid ~= "" then
+					placedMap[pUid] = true
+				end
+			end
+		end
+
+		local eligibleUids: { string } = {}
+		local totalGold = 0
+		local gradedOrEnchantedCount = 0
+
+		if typeof(ownedSwords) == "table" then
+			for _, entry in ownedSwords do
+				if typeof(entry) == "table" and typeof(entry.uid) == "string" then
+					if entry.uid ~= equippedUid and not placedMap[entry.uid] and entry.locked ~= true then
+						table.insert(eligibleUids, entry.uid)
+						totalGold += InventoryService.CalculateSwordSalePrice(entry)
+						if (entry.grade and entry.grade ~= "") or (entry.enchant and entry.enchant ~= "") then
+							gradedOrEnchantedCount += 1
+						end
+					end
+				end
+			end
+		end
+
+		local token = HttpService:GenerateGUID(false):sub(1, 12)
+
+		-- Store snapshot valid for 60 seconds
+		sellSnapshots[player] = {
+			token = token,
+			createdAt = os.clock(),
+			uids = eligibleUids,
+		}
+
+		return true, {
+			token = token,
+			count = #eligibleUids,
+			totalGold = math.floor(totalGold + 0.5),
+			gradedOrEnchantedCount = gradedOrEnchantedCount,
+		}, nil
+	end)
+
+	if not ok then
+		warn(("[InventoryService.GetSellAllPreview] Error for %s: %s"):format(player.Name, tostring(success)))
+		return false, nil, "An unexpected error occurred while generating Sell All preview."
+	end
+
+	return success, data, errMsg
+end
+
+-- Executes Sell All using the server-side snapshot. Sells ONLY those snapshot uids that
+-- remain owned, unlocked, unequipped, and unplaced. Requires matching token and snapshot age <= 60s.
+function InventoryService.SellAll(player: Player, token: unknown): (boolean, number?, number?, string?)
+	if not checkRateLimit(player) then
+		return false, nil, nil, "Action rate limited. Please slow down."
+	end
+
+	if typeof(token) ~= "string" or token == "" then
+		return false, nil, nil, "Preview again"
+	end
+
+	if not DataService.IsLoaded(player) then
+		return false, nil, nil, "Data is loading..."
+	end
+
+	if not PlayerActionLock.Acquire(player) then
+		return false, nil, nil, "Another inventory or pedestal action is in progress."
+	end
+
+	local ok, success, soldCount, goldEarned, errMsg = pcall(function(): (boolean, number?, number?, string?)
+		local snap = sellSnapshots[player]
+		if not snap or (os.clock() - snap.createdAt) > 60 or snap.token ~= token then
+			sellSnapshots[player] = nil
+			return false, nil, nil, "Preview again"
+		end
+
+		local snapSet: { [string]: boolean } = {}
+		for _, uid in snap.uids do
+			snapSet[uid] = true
+		end
+
+		local ownedSwords = DataService.Get(player, "OwnedSwords")
+		local currentGold = DataService.Get(player, "Gold") or 0
+		local equippedUid = DataService.Get(player, "EquippedSword")
+		local placedSwords = DataService.Get(player, "PlacedSwords")
+
+		if typeof(ownedSwords) ~= "table" then
+			sellSnapshots[player] = nil
+			return false, 0, 0, "No swords owned."
+		end
+
+		local placedMap: { [string]: boolean } = {}
+		if typeof(placedSwords) == "table" then
+			for _, pUid in placedSwords do
+				if typeof(pUid) == "string" and pUid ~= "" then
+					placedMap[pUid] = true
+				end
+			end
+		end
+
+		local remainingSwords: { any } = {}
+		local actualGold = 0
+		local actualCount = 0
+
+		for _, entry in ownedSwords do
+			if typeof(entry) == "table" and typeof(entry.uid) == "string" and snapSet[entry.uid] then
+				-- Validate still eligible
+				if entry.uid ~= equippedUid and not placedMap[entry.uid] and entry.locked ~= true then
+					actualCount += 1
+					actualGold += InventoryService.CalculateSwordSalePrice(entry)
+				else
+					table.insert(remainingSwords, entry)
+				end
+			else
+				table.insert(remainingSwords, entry)
+			end
+		end
+
+		sellSnapshots[player] = nil
+
+		if actualCount == 0 then
+			return false, 0, 0, "No eligible swords to sell."
+		end
+
+		if typeof(currentGold) ~= "number" then
+			currentGold = 0
+		end
+		local newGold = math.floor(currentGold + actualGold + 0.5)
+
+		-- Atomic write of remaining swords and new Gold
+		local saved = DataService.SetMany(player, {
+			OwnedSwords = remainingSwords,
+			Gold = newGold,
+		})
+
+		if saved then
+			return true, actualCount, math.floor(actualGold + 0.5), nil
+		else
+			return false, nil, nil, "Failed to complete Sell All. Changes were rolled back."
+		end
+	end)
+
+	PlayerActionLock.Release(player)
+
+	if not ok then
+		warn(("[InventoryService.SellAll] Error for %s: %s"):format(player.Name, tostring(success)))
+		return false, nil, nil, "An unexpected error occurred while executing Sell All."
+	end
+
+	return success, soldCount, goldEarned, errMsg
 end
 
 -- Ranks all owned swords by GoldPerTap descending (ties broken by rarity rank then uid)
@@ -389,6 +655,27 @@ function InventoryService.Start()
 		return InventoryService.EquipBest(player)
 	end
 
+	local toggleLockFunc = Remotes.getFunction("ToggleLock")
+	toggleLockFunc.OnServerInvoke = function(player: Player, uid: unknown)
+		if typeof(uid) ~= "string" then
+			return false, nil, "Invalid argument."
+		end
+		return InventoryService.ToggleLock(player, uid)
+	end
+
+	local getSellAllPreviewFunc = Remotes.getFunction("GetSellAllPreview")
+	getSellAllPreviewFunc.OnServerInvoke = function(player: Player)
+		return InventoryService.GetSellAllPreview(player)
+	end
+
+	local sellAllFunc = Remotes.getFunction("SellAll")
+	sellAllFunc.OnServerInvoke = function(player: Player, token: unknown)
+		if typeof(token) ~= "string" then
+			return false, nil, nil, "Preview again"
+		end
+		return InventoryService.SellAll(player, token)
+	end
+
 	local setAutoSellEvent = Remotes.getEvent("SetAutoSellRule")
 	setAutoSellEvent.OnServerEvent:Connect(function(player: Player, rarity: unknown, enabled: unknown)
 		if typeof(rarity) ~= "string" or typeof(enabled) ~= "boolean" then
@@ -399,6 +686,7 @@ function InventoryService.Start()
 
 	Players.PlayerRemoving:Connect(function(player)
 		playerBuckets[player] = nil
+		sellSnapshots[player] = nil
 	end)
 end
 

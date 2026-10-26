@@ -45,6 +45,12 @@ function InventoryController.Toggle()
 	end
 end
 
+function InventoryController.OpenAutoSell()
+	if uiInstance then
+		uiInstance:OpenAutoSell()
+	end
+end
+
 function InventoryController.Init()
 	if uiInstance then
 		return
@@ -84,6 +90,22 @@ function InventoryController.Init()
 			end)
 			if not ok or not success then
 				warn("[InventoryController] Sell failed: " .. tostring(err or "Unknown error"))
+			end
+		end)
+	end)
+
+	uiInstance:SetOnToggleLock(function(uid: string)
+		task.spawn(function()
+			local lockFunc = Remotes.getFunction("ToggleLock")
+			local ok, success, isLocked, err = pcall(function()
+				return lockFunc:InvokeServer(uid)
+			end)
+			if not ok or not success then
+				local failMsg = if not ok then "Request failed" else tostring(err or "Failed to toggle lock")
+				warn("[InventoryController] ToggleLock failed: " .. failMsg)
+				if uiInstance then
+					uiInstance:ShowFeedback(failMsg, false)
+				end
 			end
 		end)
 	end)

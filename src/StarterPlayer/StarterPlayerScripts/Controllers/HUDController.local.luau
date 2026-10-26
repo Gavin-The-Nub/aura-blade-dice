@@ -41,6 +41,9 @@ local InventoryController = require(Controllers:WaitForChild("InventoryControlle
 local MerchantController = require(Controllers:WaitForChild("MerchantController"))
 local PlotController = require(Controllers:WaitForChild("PlotController"))
 local TargetDummyController = require(Controllers:WaitForChild("TargetDummyController"))
+local ShopController = require(Controllers:WaitForChild("ShopController"))
+local SellStallController = require(Controllers:WaitForChild("SellStallController"))
+local StationController = require(Controllers:WaitForChild("StationController"))
 
 -- Initialize controllers with the HUD instance
 TapController.Init(hud)
@@ -49,6 +52,9 @@ InventoryController.Init()
 MerchantController.Init()
 PlotController.Init()
 TargetDummyController.Init()
+ShopController.Init()
+SellStallController.Init()
+StationController.Init()
 
 hud:SetOnBackpack(function()
 	InventoryController.Toggle()

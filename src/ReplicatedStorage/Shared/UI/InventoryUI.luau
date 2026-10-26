@@ -8,6 +8,7 @@ local TweenService = game:GetService("TweenService")
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Theme = require(Shared:WaitForChild("Theme"))
 local NumberFormat = require(Shared:WaitForChild("NumberFormat"))
+local SalePrice = require(Shared:WaitForChild("SalePrice"))
 local Config = ReplicatedStorage:WaitForChild("Config")
 local Swords = require(Config:WaitForChild("Swords"))
 local GameConfig = require(Config:WaitForChild("Game"))
@@ -37,10 +38,13 @@ export type InventoryUIInstance = {
 	SetOnEquip: (self: InventoryUIInstance, callback: (uid: string) -> ()) -> (),
 	SetOnUnequip: (self: InventoryUIInstance, callback: () -> ()) -> (),
 	SetOnSell: (self: InventoryUIInstance, callback: (uid: string) -> ()) -> (),
+	SetOnToggleLock: (self: InventoryUIInstance, callback: (uid: string) -> ()) -> (),
 	SetOnToggleAutoSell: (self: InventoryUIInstance, callback: (rarity: string, enabled: boolean) -> ()) -> (),
 	SetOnEquipBest: (self: InventoryUIInstance, callback: () -> ()) -> (),
 	SetEquipBestBusy: (self: InventoryUIInstance, isBusy: boolean) -> (),
 	ShowEquipBestMessage: (self: InventoryUIInstance, message: string, isSuccess: boolean?) -> (),
+	ShowFeedback: (self: InventoryUIInstance, message: string, isSuccess: boolean?) -> (),
+	OpenAutoSell: (self: InventoryUIInstance) -> (),
 	Destroy: (self: InventoryUIInstance) -> (),
 }
 
@@ -239,22 +243,33 @@ function InventoryUI.new(parentGui: Instance): InventoryUIInstance
 
 	local inspDamage = Instance.new("TextLabel")
 	inspDamage.Name = "InspDamage"
-	inspDamage.Size = UDim2.new(1, 0, 0, 20)
-	inspDamage.Position = UDim2.new(0, 0, 0, 48)
+	inspDamage.Size = UDim2.new(1, 0, 0, 18)
+	inspDamage.Position = UDim2.new(0, 0, 0, 46)
 	inspDamage.BackgroundTransparency = 1
 	inspDamage.Font = Theme.Fonts.Body
-	inspDamage.TextSize = 13
+	inspDamage.TextSize = 12
 	inspDamage.TextColor3 = Theme.Colors.TextGold
 	inspDamage.Text = ""
 	inspDamage.Parent = inspContent
 
+	local inspSellValue = Instance.new("TextLabel")
+	inspSellValue.Name = "InspSellValue"
+	inspSellValue.Size = UDim2.new(1, 0, 0, 18)
+	inspSellValue.Position = UDim2.new(0, 0, 0, 66)
+	inspSellValue.BackgroundTransparency = 1
+	inspSellValue.Font = Theme.Fonts.Body
+	inspSellValue.TextSize = 12
+	inspSellValue.TextColor3 = Theme.Colors.AuraEmerald
+	inspSellValue.Text = ""
+	inspSellValue.Parent = inspContent
+
 	local inspStatus = Instance.new("TextLabel")
 	inspStatus.Name = "InspStatus"
 	inspStatus.Size = UDim2.new(1, 0, 0, 18)
-	inspStatus.Position = UDim2.new(0, 0, 0, 72)
+	inspStatus.Position = UDim2.new(0, 0, 0, 86)
 	inspStatus.BackgroundTransparency = 1
 	inspStatus.Font = Theme.Fonts.Button
-	inspStatus.TextSize = 12
+	inspStatus.TextSize = 11
 	inspStatus.TextColor3 = Theme.Colors.TextSecondary
 	inspStatus.Text = ""
 	inspStatus.Parent = inspContent
@@ -331,10 +346,10 @@ function InventoryUI.new(parentGui: Instance): InventoryUIInstance
 		end)
 	end
 
-	-- Action buttons container (Equip and Sell)
+	-- Action buttons container (Equip, Lock, and Sell)
 	local actionContainer = Instance.new("Frame")
 	actionContainer.Name = "ActionContainer"
-	actionContainer.Size = UDim2.new(1, 0, 0, 96)
+	actionContainer.Size = UDim2.new(1, 0, 0, 114)
 	actionContainer.Position = UDim2.new(0, 0, 1, 0)
 	actionContainer.AnchorPoint = Vector2.new(0, 1)
 	actionContainer.BackgroundTransparency = 1
@@ -343,7 +358,7 @@ function InventoryUI.new(parentGui: Instance): InventoryUIInstance
 	local equipButton = Button.new({
 		Name = "EquipButton",
 		Text = "EQUIP",
-		Size = UDim2.new(1, 0, 0, 40),
+		Size = UDim2.new(1, 0, 0, 36),
 		Position = UDim2.new(0, 0, 0, 0),
 		BackgroundColor = Theme.Colors.ButtonPrimary,
 		BorderColor = Theme.Colors.AuraCyan,
@@ -352,11 +367,23 @@ function InventoryUI.new(parentGui: Instance): InventoryUIInstance
 		Parent = actionContainer,
 	})
 
+	local lockButton = Button.new({
+		Name = "LockButton",
+		Text = "LOCK",
+		Size = UDim2.new(1, 0, 0, 32),
+		Position = UDim2.new(0, 0, 0, 40),
+		BackgroundColor = Theme.Colors.ButtonSecondary,
+		BorderColor = Theme.Colors.AuraGold,
+		TextColor = Theme.Colors.TextGold,
+		CornerRadius = Theme.Corner.Medium,
+		Parent = actionContainer,
+	})
+
 	local sellButton = Button.new({
 		Name = "SellButton",
 		Text = "SELL",
-		Size = UDim2.new(1, 0, 0, 36),
-		Position = UDim2.new(0, 0, 0, 48),
+		Size = UDim2.new(1, 0, 0, 34),
+		Position = UDim2.new(0, 0, 0, 76),
 		BackgroundColor = Theme.Colors.ButtonSecondary,
 		BorderColor = Theme.Colors.ButtonClose,
 		TextColor = Theme.Colors.ButtonClose,
@@ -434,6 +461,7 @@ function InventoryUI.new(parentGui: Instance): InventoryUIInstance
 	local onEquipCallback: ((string) -> ())? = nil
 	local onUnequipCallback: (() -> ())? = nil
 	local onSellCallback: ((string) -> ())? = nil
+	local onToggleLockCallback: ((string) -> ())? = nil
 	local onToggleAutoSellCallback: ((string, boolean) -> ())? = nil
 
 	-- Chip buttons for Auto-Sell
@@ -627,51 +655,35 @@ function InventoryUI.new(parentGui: Instance): InventoryUIInstance
 			nameLbl.Text = swordDef and swordDef.name or "Unknown"
 			nameLbl.Parent = card
 
-			-- Equipped or Placed Badge
-			if isEquipped then
-				local badge = Instance.new("Frame")
-				badge.Name = "EquippedBadge"
-				badge.Size = UDim2.new(0, 16, 0, 16)
-				badge.Position = UDim2.new(1, -2, 0, 2)
-				badge.AnchorPoint = Vector2.new(1, 0)
-				badge.BackgroundColor3 = Theme.Colors.AuraEmerald
-				badge.BorderSizePixel = 0
-				badge.Parent = card
+			-- Padlock badge on top-left if sword is locked
+			if entry.locked == true then
+				local lockBadge = Instance.new("Frame")
+				lockBadge.Name = "LockBadge"
+				lockBadge.Size = UDim2.new(0, 18, 0, 18)
+				lockBadge.Position = UDim2.new(0, 2, 0, 2)
+				lockBadge.AnchorPoint = Vector2.new(0, 0)
+				lockBadge.BackgroundColor3 = Theme.Colors.PanelBackground
+				lockBadge.BackgroundTransparency = 0.2
+				lockBadge.BorderSizePixel = 0
+				lockBadge.Parent = card
 
-				local badgeCorner = Instance.new("UICorner")
-				badgeCorner.CornerRadius = Theme.Corner.Round
-				badgeCorner.Parent = badge
+				local lockCorner = Instance.new("UICorner")
+				lockCorner.CornerRadius = Theme.Corner.Round
+				lockCorner.Parent = lockBadge
 
-				local badgeText = Instance.new("TextLabel")
-				badgeText.Size = UDim2.new(1, 0, 1, 0)
-				badgeText.BackgroundTransparency = 1
-				badgeText.Text = "✓"
-				badgeText.TextColor3 = Theme.Colors.TextPrimary
-				badgeText.TextSize = 10
-				badgeText.Font = Theme.Fonts.Title
-				badgeText.Parent = badge
-			elseif isPlaced then
-				local badge = Instance.new("Frame")
-				badge.Name = "PlacedBadge"
-				badge.Size = UDim2.new(0, 24, 0, 16)
-				badge.Position = UDim2.new(1, -2, 0, 2)
-				badge.AnchorPoint = Vector2.new(1, 0)
-				badge.BackgroundColor3 = Theme.Colors.AuraCyan
-				badge.BorderSizePixel = 0
-				badge.Parent = card
+				local lockStroke = Instance.new("UIStroke")
+				lockStroke.Color = Theme.Colors.AuraGold
+				lockStroke.Thickness = 1
+				lockStroke.Parent = lockBadge
 
-				local badgeCorner = Instance.new("UICorner")
-				badgeCorner.CornerRadius = Theme.Corner.Round
-				badgeCorner.Parent = badge
-
-				local badgeText = Instance.new("TextLabel")
-				badgeText.Size = UDim2.new(1, 0, 1, 0)
-				badgeText.BackgroundTransparency = 1
-				badgeText.Text = "P#" .. tostring(placedSlot)
-				badgeText.TextColor3 = Theme.Colors.PanelBackground
-				badgeText.TextSize = 10
-				badgeText.Font = Theme.Fonts.Title
-				badgeText.Parent = badge
+				local lockIcon = Instance.new("TextLabel")
+				lockIcon.Name = "LockIcon"
+				lockIcon.Size = UDim2.new(1, 0, 1, 0)
+				lockIcon.BackgroundTransparency = 1
+				lockIcon.Text = "🔒"
+				lockIcon.TextSize = 10
+				lockIcon.TextColor3 = Theme.Colors.AuraGold
+				lockIcon.Parent = lockBadge
 			end
 
 			btn.Activated:Connect(function()
@@ -691,10 +703,14 @@ function InventoryUI.new(parentGui: Instance): InventoryUIInstance
 			inspName.TextColor3 = Theme.Colors.TextMuted
 			inspRarity.Text = ""
 			inspDamage.Text = ""
+			inspSellValue.Text = ""
 			inspStatus.Text = ""
 			equipButton:SetEnabled(false)
 			equipButton:SetText("EQUIP")
+			lockButton:SetEnabled(false)
+			lockButton:SetText("LOCK")
 			sellButton:SetEnabled(false)
+			sellButton:SetText("SELL")
 			return
 		end
 
@@ -710,8 +726,10 @@ function InventoryUI.new(parentGui: Instance): InventoryUIInstance
 			inspName.Text = "Select a Sword"
 			inspRarity.Text = ""
 			inspDamage.Text = ""
+			inspSellValue.Text = ""
 			inspStatus.Text = ""
 			equipButton:SetEnabled(false)
+			lockButton:SetEnabled(false)
 			sellButton:SetEnabled(false)
 			return
 		end
@@ -728,11 +746,26 @@ function InventoryUI.new(parentGui: Instance): InventoryUIInstance
 			end
 		end
 
+		local isLocked = (selectedEntry.locked == true)
+		local salePrice = SalePrice.calculate(selectedEntry)
+
 		inspName.Text = swordDef and swordDef.name or "Sword"
 		inspName.TextColor3 = rarityColor
 		inspRarity.Text = ("%s (1 in %s)"):format(rarityName:upper(), swordDef and NumberFormat.format(swordDef.baseOdds) or "?")
 		inspRarity.TextColor3 = rarityColor
 		inspDamage.Text = ("Base Damage: %s Gold/Tap"):format(swordDef and NumberFormat.format(swordDef.baseDamage) or "1")
+		inspSellValue.Text = ("Sell Value: +%s Gold"):format(NumberFormat.format(salePrice))
+
+		lockButton:SetEnabled(true)
+		if isLocked then
+			lockButton:SetText("UNLOCK")
+			lockButton:SetBorderColor(Theme.Colors.Border)
+			lockButton:SetTextColor(Theme.Colors.TextPrimary)
+		else
+			lockButton:SetText("LOCK")
+			lockButton:SetBorderColor(Theme.Colors.AuraGold)
+			lockButton:SetTextColor(Theme.Colors.TextGold)
+		end
 
 		if isEquipped then
 			inspStatus.Text = "STATUS: EQUIPPED"
@@ -741,6 +774,9 @@ function InventoryUI.new(parentGui: Instance): InventoryUIInstance
 			equipButton:SetBorderColor(Theme.Colors.Border)
 			equipButton:SetEnabled(true)
 			sellButton:SetEnabled(false)
+			sellButton:SetText("SELL")
+			sellButton:SetBorderColor(Theme.Colors.BorderSubtle)
+			sellButton:SetTextColor(Theme.Colors.TextMuted)
 		elseif placedSlot ~= nil then
 			inspStatus.Text = ("STATUS: PLACED ON PEDESTAL #%d"):format(placedSlot)
 			inspStatus.TextColor3 = Theme.Colors.AuraCyan
@@ -748,13 +784,26 @@ function InventoryUI.new(parentGui: Instance): InventoryUIInstance
 			equipButton:SetBorderColor(Theme.Colors.Border)
 			equipButton:SetEnabled(false) -- Disabled for placed swords
 			sellButton:SetEnabled(false)  -- Disabled for placed swords
+			sellButton:SetText("SELL")
+			sellButton:SetBorderColor(Theme.Colors.BorderSubtle)
+			sellButton:SetTextColor(Theme.Colors.TextMuted)
 		else
 			inspStatus.Text = "STATUS: IN BACKPACK"
 			inspStatus.TextColor3 = Theme.Colors.TextSecondary
 			equipButton:SetText("EQUIP")
 			equipButton:SetBorderColor(rarityColor)
 			equipButton:SetEnabled(true)
-			sellButton:SetEnabled(true)
+			if isLocked then
+				sellButton:SetEnabled(false)
+				sellButton:SetText("Locked")
+				sellButton:SetBorderColor(Theme.Colors.BorderSubtle)
+				sellButton:SetTextColor(Theme.Colors.TextMuted)
+			else
+				sellButton:SetEnabled(true)
+				sellButton:SetText(("SELL (+%s)"):format(NumberFormat.format(salePrice)))
+				sellButton:SetBorderColor(Theme.Colors.ButtonClose)
+				sellButton:SetTextColor(Theme.Colors.ButtonClose)
+			end
 		end
 	end
 
@@ -771,6 +820,13 @@ function InventoryUI.new(parentGui: Instance): InventoryUIInstance
 		end
 	end)
 
+	lockButton.Instance.Activated:Connect(function()
+		if not selectedUid then return end
+		if onToggleLockCallback then
+			onToggleLockCallback(selectedUid)
+		end
+	end)
+
 	sellButton.Instance.Activated:Connect(function()
 		if not selectedUid then return end
 		if selectedUid == currentEquippedUid then return end
@@ -782,9 +838,11 @@ function InventoryUI.new(parentGui: Instance): InventoryUIInstance
 				break
 			end
 		end
+		if not selectedEntry or selectedEntry.locked == true then return end
 		local swordDef = selectedEntry and swordDefMap[selectedEntry.id]
 		local name = swordDef and swordDef.name or "this sword"
-		sellConfirmText.Text = ("Are you sure you want to sell [%s]?\n(Sold swords are permanently removed with no Gold.)"):format(name)
+		local salePrice = SalePrice.calculate(selectedEntry)
+		sellConfirmText.Text = ("Are you sure you want to sell %s for +%s Gold?\n\n(This action cannot be undone.)"):format(name, NumberFormat.format(salePrice))
 		sellConfirmPopup:Open()
 	end)
 
@@ -808,6 +866,21 @@ function InventoryUI.new(parentGui: Instance): InventoryUIInstance
 			currentEquippedUid = equippedUid or ""
 			currentAutoSellRules = autoSellRules or {}
 			currentPlacedSwords = placedSwords or {}
+
+			-- Cleanly deselect if the selected sword was sold or removed
+			local stillExists = false
+			if selectedUid then
+				for _, e in currentOwnedSwords do
+					if e.uid == selectedUid then
+						stillExists = true
+						break
+					end
+				end
+			end
+			if not stillExists then
+				selectedUid = nil
+			end
+
 			updateChips()
 			rebuildGrid()
 		end,
@@ -819,6 +892,9 @@ function InventoryUI.new(parentGui: Instance): InventoryUIInstance
 		end,
 		SetOnSell = function(_, callback: (uid: string) -> ())
 			onSellCallback = callback
+		end,
+		SetOnToggleLock = function(_, callback: (uid: string) -> ())
+			onToggleLockCallback = callback
 		end,
 		SetOnToggleAutoSell = function(_, callback: (rarity: string, enabled: boolean) -> ())
 			onToggleAutoSellCallback = callback
@@ -833,6 +909,12 @@ function InventoryUI.new(parentGui: Instance): InventoryUIInstance
 		ShowEquipBestMessage = function(_, message: string, isSuccess: boolean?)
 			showFeedback(message, isSuccess)
 		end,
+		ShowFeedback = function(_, message: string, isSuccess: boolean?)
+			showFeedback(message, isSuccess)
+		end,
+		OpenAutoSell = function(this)
+			this:Open()
+		end,
 		Destroy = function(_)
 			if feedbackTimer then
 				task.cancel(feedbackTimer)
@@ -843,6 +925,7 @@ function InventoryUI.new(parentGui: Instance): InventoryUIInstance
 			cancelSellBtn:Destroy()
 			confirmSellBtn:Destroy()
 			equipButton:Destroy()
+			lockButton:Destroy()
 			sellButton:Destroy()
 			inspectorPanel:Destroy()
 			gridPanel:Destroy()

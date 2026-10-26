@@ -31,6 +31,7 @@ export type ButtonComponent = {
 	SetText: (self: ButtonComponent, text: string) -> (),
 	SetEnabled: (self: ButtonComponent, enabled: boolean) -> (),
 	SetBorderColor: (self: ButtonComponent, color: Color3) -> (),
+	SetTextColor: (self: ButtonComponent, color: Color3) -> (),
 	Destroy: (self: ButtonComponent) -> (),
 }
 
@@ -198,6 +199,11 @@ function Button.new(config: ButtonConfig): ButtonComponent
 			baseBorder = color
 			if isEnabled then
 				stroke.Color = color
+			end
+		end,
+		SetTextColor = function(_, color: Color3)
+			if isEnabled then
+				label.TextColor3 = color
 			end
 		end,
 		Destroy = function(_)

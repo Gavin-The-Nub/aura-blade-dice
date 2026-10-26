@@ -41,21 +41,20 @@ Out (do NOT build): Relic Accessories (removed), splash damage (removed, there i
 
 ```
 ReplicatedStorage/
-  Config/        -- Assets, DataTemplate, Dice, Game, Grades, Swords; Enchants/Blessings/Rebirths/Trials/Events (planned)
+  Config/        -- Assets, DataTemplate, Dice, Game, Grades, Stations, Swords; Enchants/Blessings/Rebirths/Trials/Events (planned)
   Shared/        -- NumberFormat, Remotes, Theme; WeightedRandom (planned)
-    UI/          -- InventoryUI, MerchantUI, OfflineIncomePopup, SwordSelectorPopup
+    UI/          -- InventoryUI, MerchantUI, OfflineIncomePopup, SellStallUI, ShopUI, SwordSelectorPopup
       Components/-- Button, Panel, Popup
       HUD/       -- MainHUD
 ServerScriptService/
   Main (Script)  -- starts all services
   PlayerActionLock (ModuleScript) -- lives at ServerScriptService/PlayerActionLock (not in Services/)
   EconSim (ModuleScript) -- lives at ServerScriptService/EconSim (not in Services/)
-  Services/      -- DataService, DevCommands, InventoryService (Equip, Equip Best, Sell; Sell All [planned], Lock [planned]), MerchantService, PlotService, RollService, TapService; RebirthService (planned), TrialService (planned), EventService (planned)
+  Services/      -- DataService, DevCommands, InventoryService (Equip, Equip Best, Sell, Sell All, Lock), MerchantService, PlotService, RollService, StationService, TapService; RebirthService (planned), TrialService (planned), EventService (planned)
 StarterPlayer/
   StarterPlayerScripts/
-    Controllers/ -- DevFeedback, HUDController, InventoryController, MerchantController, PlotController, RollController, TapController, TargetDummyController
-Workspace/       -- World map & interaction zones: Personal Plots (Dummies, Pedestals), Stations (Plaza: Dice Merchant; Sell Stall [planned], Shop [planned]; Near Trials: Master Appraiser [planned], Enchanter [planned], Runesmith [planned])
-Tools/Scripts/   -- Economy simulation & testing scripts (planned)
+    Controllers/ -- DevFeedback, HUDController, InventoryController, MerchantController, PlotController, RollController, SellStallController, ShopController, StationController, TapController, TargetDummyController
+Workspace/       -- World map & interaction zones: Personal Plots (Dummies, Pedestals), Stations (Plaza: Dice Merchant, Sell Stall [Sell All, Lock, single sell], Shop [placeholder]; Near Trials: Master Appraiser [planned], Enchanter [planned], Runesmith [planned])
 ```
 
 **Script Sync Rule:** Only create folders inside folders that are already synced (`Config`, `Shared`, `Services`, `Controllers`). If you ever need a new top-level folder, ask the user first so they can link it with Script Sync.
@@ -103,3 +102,5 @@ Costs reach Septillion scale. Use normal Luau numbers (doubles). Always display 
 - **Dual Wielding:** Needs two equipped swords, but the codebase and player data model currently assume a single `EquippedSword`.
 - **Rebirth Multipliers & Costs:** Multipliers and Gold costs in Config and GDD are unverified placeholders until confirmed against Anime Dice.
 - **Sword List Content:** The sword list in `Config/Swords` is too short for the high-Luck dice (players with top-tier dice will roll beyond the highest-rarity swords currently defined).
+- **Sword Grade & Enchant Field Names & Multipliers:** When Grade Appraiser and Enchanter are built, Grade and Enchant fields on sword data entries must be named lowercase `grade` and `enchant` (strings), because `InventoryService.GetSellAllPreview` and `SellStallUI` explicitly read those field names for warnings. Additionally, `Shared/SalePrice.luau`, `TapService.CalculateSwordGoldPerTap`, and `PlotService.refreshPedestals` must read the grade and enchant multipliers from the sword entry (currently placeholder/stubbed at 1.0).
+- **Economy Simulation - Sell Income:** Sword sale Gold income (single sell, Sell All, and Auto-Sell) is not yet modeled in `ServerScriptService/EconSim.luau`; `Game.Selling.BaseDamageMultiplier = 10` is a placeholder pending EconSim integration.

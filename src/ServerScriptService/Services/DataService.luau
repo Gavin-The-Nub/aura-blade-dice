@@ -159,6 +159,17 @@ local function onPlayerAdded(player: Player)
 		end
 	end
 
+	-- Migrate OwnedSwords: ensure every entry has a boolean locked field (default false)
+	if type(profile.Data.OwnedSwords) == "table" then
+		for _, entry in profile.Data.OwnedSwords do
+			if type(entry) == "table" and typeof(entry.locked) ~= "boolean" then
+				entry.locked = false
+			end
+		end
+	else
+		profile.Data.OwnedSwords = {}
+	end
+
 	-- Reset EquippedSword to "" if its uid isn't owned
 	local equippedUid = profile.Data.EquippedSword
 	if type(equippedUid) == "string" and equippedUid ~= "" then
