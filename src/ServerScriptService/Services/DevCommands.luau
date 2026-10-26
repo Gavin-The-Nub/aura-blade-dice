@@ -19,6 +19,7 @@ local InventoryService = require(ServerScriptService.Services.InventoryService)
 local Dice = require(ReplicatedStorage.Config.Dice)
 local NumberFormat = require(ReplicatedStorage.Shared.NumberFormat)
 local Remotes = require(ReplicatedStorage.Shared.Remotes)
+local EconSim = require(ServerScriptService.EconSim)
 
 local DevCommands = {}
 
@@ -252,6 +253,77 @@ local function onEquipBestCommand(originTextSource: TextSource, _unfilteredText:
 	say(player, msg or (if ok then "Equip Best succeeded!" else "Equip Best failed!"))
 end
 
+local function onEconCommand(originTextSource: TextSource, unfilteredText: string)
+	local player = Players:GetPlayerByUserId(originTextSource.UserId)
+	if player == nil then
+		return
+	end
+
+	local textLower = unfilteredText:lower()
+
+	-- Handle "/econ expected": prints expected multipliers for Grades & Enchants
+	if textLower:find("expected") then
+		say(player, "[EconSim] Calculating expected multipliers for Grades & Enchants... Results printed to Output!")
+		local res = EconSim.PrintExpected(player)
+		if res and res.Grades and res.Enchants then
+			say(player, ("[EconSim] Expected: 1-roll: Grade %.2fx, Enchant %.2fx (%.1fx combined) | Best-of-100: Grade %.2fx, Enchant %.2fx (%.1fx combined)"):format(
+				res.Grades[1] or 0,
+				res.Enchants[1] or 0,
+				(res.Grades[1] or 0) * (res.Enchants[1] or 0),
+				res.Grades[100] or 0,
+				res.Enchants[100] or 0,
+				(res.Grades[100] or 0) * (res.Enchants[100] or 0)
+			))
+		end
+		return
+	end
+
+	local isExtended = textLower:find("extended") ~= nil
+
+	-- Extract scope N if present (e.g. "/econ scope 10")
+	local scopeNum: number? = nil
+	local scopeMatch = textLower:match("scope%s+(%d+)")
+	if scopeMatch then
+		scopeNum = tonumber(scopeMatch)
+	end
+
+	-- Remove command token, "extended", and "scope %d+" to extract numeric multipliers
+	local cleaned = textLower
+		:gsub("^%S+", "")
+		:gsub("extended", "")
+		:gsub("scope%s+%d+", "")
+
+	local args: { number } = {}
+	for num in cleaned:gmatch("[%d%.]+") do
+		local val = tonumber(num)
+		if val then
+			table.insert(args, val)
+		end
+	end
+
+	local goldMult = args[1] or 1.0
+	local luckMult = args[2] or 1.0
+	local critFeverFactor = args[3] or 1.0
+
+	say(player, ("[EconSim] Running %s simulation (Scope: %s, Gold: %.1fx, Luck: %.1fx, Crit/Fever: %.2fx)... Full tables printed to Output!"):format(
+		if isExtended then "extended" else "standard",
+		if scopeNum then ("T1.." .. tostring(scopeNum)) else "all",
+		goldMult,
+		luckMult,
+		critFeverFactor
+	))
+
+	local report = EconSim.Run(player, goldMult, luckMult, isExtended, scopeNum, critFeverFactor)
+	if report then
+		say(player, ("[EconSim] Done! Pool runout: %s | Auto-Tap >24h: %s | Exceed Budget A: %s | Exceed Budget B: %s"):format(
+			if report.firstPoolRunoutTier then ("T" .. tostring(report.firstPoolRunoutTier)) else "None",
+			if report.first24hAutoTapTier then ("T" .. tostring(report.first24hAutoTapTier)) else "None",
+			if report.firstExceedBudgetA_Auto then ("T" .. tostring(report.firstExceedBudgetA_Auto)) else "None",
+			if report.firstExceedBudgetB_Auto then ("T" .. tostring(report.firstExceedBudgetB_Auto)) else "None"
+		))
+	end
+end
+
 function DevCommands.Start()
 	if not RunService:IsStudio() then
 		return
@@ -316,6 +388,12 @@ function DevCommands.Start()
 	equipBestCommand.PrimaryAlias = "/equipbest"
 	equipBestCommand.Triggered:Connect(onEquipBestCommand)
 	equipBestCommand.Parent = TextChatService
+
+	local econCommand = Instance.new("TextChatCommand")
+	econCommand.Name = "DevEconCommand"
+	econCommand.PrimaryAlias = "/econ"
+	econCommand.Triggered:Connect(onEconCommand)
+	econCommand.Parent = TextChatService
 end
 
 return DevCommands

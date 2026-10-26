@@ -49,6 +49,7 @@ ReplicatedStorage/
 ServerScriptService/
   Main (Script)  -- starts all services
   PlayerActionLock (ModuleScript) -- lives at ServerScriptService/PlayerActionLock (not in Services/)
+  EconSim (ModuleScript) -- lives at ServerScriptService/EconSim (not in Services/)
   Services/      -- DataService, DevCommands, InventoryService (Equip, Equip Best, Sell; Sell All [planned], Lock [planned]), MerchantService, PlotService, RollService, TapService; RebirthService (planned), TrialService (planned), EventService (planned)
 StarterPlayer/
   StarterPlayerScripts/

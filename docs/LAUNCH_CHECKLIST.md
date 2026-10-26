@@ -18,8 +18,9 @@ The following commands are implemented in `src/ServerScriptService/Services/DevC
 - [ ] **/unplace `<slot>`**: Removes sword from target pedestal slot.
 - [ ] **/fakeoffline [now] `<hours>`**: Stages or immediately simulates `<hours>` of offline income.
 - [ ] **/equipbest**: Automatically equips best damage sword and places top remaining swords onto pedestals.
+- [ ] **/econ [extended] [expected] [scope N] [goldMult] [luckMult] [critFeverFactor]**: Runs comprehensive economy and progression simulation across all 29 Dice tiers, or calculates expected Grade/Enchant multipliers.
 
-> **Production Safeguard:** Verify that `DevCommands.luau` includes `if not RunService:IsStudio() then return end` or is completely removed from `src/ServerScriptService/Services/` before production builds.
+> **Production Safeguard:** Verify that `DevCommands.luau` and `ServerScriptService/EconSim.luau` include Studio-only gating or are removed before production builds.
 
 ---
 
