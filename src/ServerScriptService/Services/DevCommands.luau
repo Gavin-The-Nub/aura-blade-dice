@@ -17,6 +17,7 @@ local RollService = require(ServerScriptService.Services.RollService)
 local PlotService = require(ServerScriptService.Services.PlotService)
 local InventoryService = require(ServerScriptService.Services.InventoryService)
 local Dice = require(ReplicatedStorage.Config.Dice)
+local Grades = require(ReplicatedStorage.Config.Grades)
 local NumberFormat = require(ReplicatedStorage.Shared.NumberFormat)
 local Remotes = require(ReplicatedStorage.Shared.Remotes)
 local EconSim = require(ServerScriptService.EconSim)
@@ -55,6 +56,110 @@ local function onGoldCommand(originTextSource: TextSource, unfilteredText: strin
 		say(player, ("Gold is now %s (%d)"):format(NumberFormat.format(gold), gold))
 	else
 		say(player, "/gold rejected (data not loaded yet, or invalid value)")
+	end
+end
+
+local function onGemsCommand(originTextSource: TextSource, unfilteredText: string)
+	local player = Players:GetPlayerByUserId(originTextSource.UserId)
+	if player == nil then
+		return
+	end
+
+	local arg = unfilteredText:match("^%S+%s+(%S+)")
+	local amount = tonumber(arg)
+	if arg == nil or amount == nil then
+		say(player, "Usage: /gems <amount>  or  /gems +<amount>")
+		return
+	end
+
+	local ok
+	if arg:sub(1, 1) == "+" then
+		ok = DataService.Increment(player, "Gems", amount)
+	else
+		ok = DataService.Set(player, "Gems", amount)
+	end
+
+	local gems = DataService.Get(player, "Gems")
+	if ok and type(gems) == "number" then
+		say(player, ("Gems is now %s (%d)"):format(NumberFormat.format(gems), gems))
+	else
+		say(player, "/gems rejected (data not loaded yet, or invalid value)")
+	end
+end
+
+local function onSetGradeCommand(originTextSource: TextSource, unfilteredText: string)
+	local player = Players:GetPlayerByUserId(originTextSource.UserId)
+	if player == nil then
+		return
+	end
+
+	local idxStr, gradeArg = unfilteredText:match("^%S+%s+(%S+)%s*(%S*)")
+	local index = tonumber(idxStr)
+	if not index or index < 1 then
+		say(player, "Usage: /setgrade <inventoryIndex> <grade>")
+		return
+	end
+
+	local grade = gradeArg or ""
+	if grade ~= "" and not Grades.GetGradeDef(grade) then
+		say(player, ("Invalid grade '%s'. Valid grades: D, C, B, A, S, SS, SSS, Z, Z+ (or empty string for ungraded)"):format(grade))
+		return
+	end
+
+	local owned = DataService.Get(player, "OwnedSwords")
+	if type(owned) ~= "table" or not owned[index] then
+		say(player, ("Inventory index %d out of bounds (you have %d swords)"):format(index, type(owned) == "table" and #owned or 0))
+		return
+	end
+
+	local updated = table.clone(owned)
+	local entry = table.clone(updated[index])
+	entry.grade = if grade ~= "" then grade else nil
+	updated[index] = entry
+
+	local ok = DataService.Set(player, "OwnedSwords", updated)
+	if ok then
+		say(player, ("Sword #%d (%s) grade set to: %s"):format(index, entry.id or "sword", if grade ~= "" then grade else "Ungraded"))
+	else
+		say(player, "/setgrade failed to save.")
+	end
+end
+
+local function onGradeTestCommand(originTextSource: TextSource, unfilteredText: string)
+	local player = Players:GetPlayerByUserId(originTextSource.UserId)
+	if player == nil then
+		return
+	end
+
+	local arg = unfilteredText:match("^%S+%s+(%S+)")
+	local count = tonumber(arg) or 1000
+	if count <= 0 then
+		count = 1000
+	end
+
+	local counts: { [string]: number } = {}
+	for _, def in ipairs(Grades.GetAll()) do
+		counts[def.name] = 0
+	end
+
+	for _ = 1, count do
+		local rolled = Grades.RollRandomGrade()
+		counts[rolled.name] = (counts[rolled.name] or 0) + 1
+	end
+
+	print(("[DevCommands] ====== Grade Distribution Test (%d Rolls) ======"):format(count))
+	say(player, ("[GradeTest] Simulating %d rolls against Config/Grades... (check Output)"):format(count))
+	for _, def in ipairs(Grades.GetAll()) do
+		local c = counts[def.name] or 0
+		local actual = (c / count) * 100
+		local exp = def.rollChance
+		print(("[DevCommands] Grade %-4s : %6d (%6.2f%%) | Expected: %6.2f%% (x%.2f)"):format(
+			def.name,
+			c,
+			actual,
+			exp,
+			def.multiplier
+		))
 	end
 end
 
@@ -394,6 +499,24 @@ function DevCommands.Start()
 	econCommand.PrimaryAlias = "/econ"
 	econCommand.Triggered:Connect(onEconCommand)
 	econCommand.Parent = TextChatService
+
+	local gemsCommand = Instance.new("TextChatCommand")
+	gemsCommand.Name = "DevGemsCommand"
+	gemsCommand.PrimaryAlias = "/gems"
+	gemsCommand.Triggered:Connect(onGemsCommand)
+	gemsCommand.Parent = TextChatService
+
+	local setGradeCommand = Instance.new("TextChatCommand")
+	setGradeCommand.Name = "DevSetGradeCommand"
+	setGradeCommand.PrimaryAlias = "/setgrade"
+	setGradeCommand.Triggered:Connect(onSetGradeCommand)
+	setGradeCommand.Parent = TextChatService
+
+	local gradeTestCommand = Instance.new("TextChatCommand")
+	gradeTestCommand.Name = "DevGradeTestCommand"
+	gradeTestCommand.PrimaryAlias = "/gradetest"
+	gradeTestCommand.Triggered:Connect(onGradeTestCommand)
+	gradeTestCommand.Parent = TextChatService
 end
 
 return DevCommands

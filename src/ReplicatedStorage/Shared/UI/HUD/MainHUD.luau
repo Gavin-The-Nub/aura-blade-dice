@@ -10,6 +10,7 @@ local UserInputService = game:GetService("UserInputService")
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Theme = require(Shared:WaitForChild("Theme"))
 local NumberFormat = require(Shared:WaitForChild("NumberFormat"))
+local SalePrice = require(Shared:WaitForChild("SalePrice"))
 local Assets = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Assets"))
 local Swords = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Swords"))
 local GameConfig = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Game"))
@@ -21,6 +22,7 @@ local Button = require(Components:WaitForChild("Button"))
 export type MainHUDInstance = {
 	Gui: ScreenGui,
 	UpdateGold: (self: MainHUDInstance, amount: number) -> (),
+	UpdateGems: (self: MainHUDInstance, amount: number) -> (),
 	UpdateFever: (self: MainHUDInstance, points: number, maxPoints: number, isActive: boolean, durationRemaining: number) -> (),
 	SetAutoTapState: (self: MainHUDInstance, isEnabled: boolean) -> (),
 	SetAutoRollState: (self: MainHUDInstance, isEnabled: boolean) -> (),
@@ -296,6 +298,29 @@ function MainHUD.new(parentGui: Instance): MainHUDInstance
 	goldStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Contextual
 	goldStroke.Parent = goldLabel
 
+	-- 2b. Gems Counter: Directly above Gold counter
+	local gemsLabel = Instance.new("TextLabel")
+	gemsLabel.Name = "GemsAmount"
+	gemsLabel.Size = UDim2.new(0, 360, 0, 32)
+	gemsLabel.Position = UDim2.new(0, 24, 1, -74)
+	gemsLabel.AnchorPoint = Vector2.new(0, 1)
+	gemsLabel.BackgroundTransparency = 1
+	gemsLabel.Text = "💎 0"
+	gemsLabel.TextColor3 = Theme.Colors.AuraCyan
+	gemsLabel.TextXAlignment = Enum.TextXAlignment.Left
+	gemsLabel.TextYAlignment = Enum.TextYAlignment.Bottom
+	gemsLabel.TextScaled = false
+	gemsLabel.TextSize = 26
+	gemsLabel.Font = Theme.Fonts.Number
+	gemsLabel.ZIndex = 5
+	gemsLabel.Parent = root
+
+	local gemsStroke = Instance.new("UIStroke")
+	gemsStroke.Color = Theme.TextStroke.Color
+	gemsStroke.Thickness = Theme.TextStroke.Thickness
+	gemsStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Contextual
+	gemsStroke.Parent = gemsLabel
+
 
 
 	local function createPlaceholderPopup(title: string, desc: string): Popup.PopupComponent
@@ -496,13 +521,19 @@ function MainHUD.new(parentGui: Instance): MainHUDInstance
 		local rarityColor = (Swords.RarityColors and Swords.RarityColors[swordDef.rarity]) or Theme.Colors.AuraCyan
 		local rarityText = ("%s (1 in %s)"):format(string.upper(swordDef.rarity), NumberFormat.format(swordDef.baseOdds))
 		if isAutoSold then
-			rarityText ..= " • AUTO-SOLD"
+			local goldGained = SalePrice.calculate(swordDef)
+			rarityText ..= (" • AUTO-SOLD (+%s Gold)"):format(NumberFormat.format(goldGained))
+			rollPopupDamageLabel.Text = ("Base Damage: %s Gold/Tap  •  Auto-Sold: +%s Gold"):format(
+				NumberFormat.format(swordDef.baseDamage),
+				NumberFormat.format(goldGained)
+			)
+		else
+			rollPopupDamageLabel.Text = ("Base Damage: %s Gold/Tap"):format(NumberFormat.format(swordDef.baseDamage))
 		end
 		rollPopupRarityLabel.Text = rarityText
 		rollPopupRarityLabel.TextColor3 = rarityColor
 		rollPopupSwordLabel.Text = swordDef.name
 		rollPopupSwordLabel.TextColor3 = rarityColor
-		rollPopupDamageLabel.Text = ("Base Damage: %s Gold/Tap"):format(NumberFormat.format(swordDef.baseDamage))
 
 		local claimStroke = claimButton.Instance:FindFirstChildOfClass("UIStroke")
 		if claimStroke then
@@ -565,7 +596,8 @@ function MainHUD.new(parentGui: Instance): MainHUDInstance
 			toastStroke.Color = rarityColor
 			toastLabel.TextColor3 = rarityColor
 			if isAutoSold then
-				toastLabel.Text = ("Auto-Sold: [%s] (%s)"):format(swordOrText.name, swordOrText.rarity)
+				local goldGained = SalePrice.calculate(swordOrText)
+				toastLabel.Text = ("Auto-Sold: [%s] (+%s Gold)"):format(swordOrText.name, NumberFormat.format(goldGained))
 			else
 				toastLabel.Text = ("Rolled: [%s] (%s)"):format(swordOrText.name, swordOrText.rarity)
 			end
@@ -1010,6 +1042,9 @@ function MainHUD.new(parentGui: Instance): MainHUDInstance
 		Gui = screenGui,
 		UpdateGold = function(_, amount: number)
 			goldLabel.Text = "$" .. NumberFormat.format(amount)
+		end,
+		UpdateGems = function(_, amount: number)
+			gemsLabel.Text = "💎 " .. NumberFormat.format(amount)
 		end,
 		UpdateFever = function(_, points: number, maxPoints: number, isActive: boolean, durationRemaining: number)
 			updateFeverDisplay(points, maxPoints, isActive, durationRemaining)

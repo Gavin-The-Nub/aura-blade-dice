@@ -30,7 +30,8 @@ function SalePrice.calculate(swordEntryOrDef: any): number
 	end
 
 	local mult = (GameConfig.Selling and GameConfig.Selling.BaseDamageMultiplier) or 10
-	local gradeMultiplier = 1.0 -- placeholder until Grades system is added
+	-- Grade multiplier is intentionally kept at 1.0 to prevent an infinite Gem-to-Gold loop until economy tuning is complete
+	local gradeMultiplier = 1.0
 	local enchantMultiplier = 1.0 -- placeholder until Enchants system is added
 
 	return math.max(1, math.floor((baseDamage * mult * gradeMultiplier * enchantMultiplier) + 0.5))

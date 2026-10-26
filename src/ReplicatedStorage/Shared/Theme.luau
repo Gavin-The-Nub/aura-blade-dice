@@ -15,10 +15,12 @@ export type Theme = {
 		BorderSubtle: Color3,
 		
 		AuraCyan: Color3,
+		AuraBlue: Color3,
 		AuraPurple: Color3,
 		AuraGold: Color3,
 		AuraCrimson: Color3,
 		AuraEmerald: Color3,
+		AuraRainbow: Color3,
 		
 		TextPrimary: Color3,
 		TextSecondary: Color3,
@@ -58,6 +60,7 @@ export type Theme = {
 		Pop: TweenInfo,
 		Smooth: TweenInfo,
 	},
+	RainbowSequence: ColorSequence,
 }
 
 local Theme: Theme = {
@@ -73,10 +76,12 @@ local Theme: Theme = {
 		BorderSubtle = Color3.fromRGB(32, 38, 54),
 
 		AuraCyan = Color3.fromRGB(0, 229, 255),      -- Blade edge / spirit
+		AuraBlue = Color3.fromRGB(59, 130, 246),     -- Grade A
 		AuraPurple = Color3.fromRGB(168, 85, 247),    -- Void / enchant
 		AuraGold = Color3.fromRGB(255, 204, 0),       -- Wealth / dice luck
 		AuraCrimson = Color3.fromRGB(255, 64, 96),    -- Fever / crit
 		AuraEmerald = Color3.fromRGB(34, 197, 94),    -- Grades / growth
+		AuraRainbow = Color3.fromRGB(255, 127, 255),  -- Grade Z+ fallback
 
 		TextPrimary = Color3.fromRGB(248, 250, 252),
 		TextSecondary = Color3.fromRGB(170, 180, 200),
@@ -116,6 +121,15 @@ local Theme: Theme = {
 		Pop = TweenInfo.new(0.2, Enum.EasingStyle.Back, Enum.EasingDirection.Out),
 		Smooth = TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
 	},
+	RainbowSequence = ColorSequence.new({
+		ColorSequenceKeypoint.new(0.0, Color3.fromRGB(255, 60, 60)),
+		ColorSequenceKeypoint.new(0.17, Color3.fromRGB(255, 160, 40)),
+		ColorSequenceKeypoint.new(0.33, Color3.fromRGB(255, 235, 50)),
+		ColorSequenceKeypoint.new(0.5, Color3.fromRGB(50, 230, 100)),
+		ColorSequenceKeypoint.new(0.67, Color3.fromRGB(0, 220, 255)),
+		ColorSequenceKeypoint.new(0.83, Color3.fromRGB(160, 80, 255)),
+		ColorSequenceKeypoint.new(1.0, Color3.fromRGB(255, 100, 220)),
+	}),
 }
 
 return Theme

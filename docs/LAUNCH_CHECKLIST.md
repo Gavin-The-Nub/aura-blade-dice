@@ -19,6 +19,9 @@ The following commands are implemented in `src/ServerScriptService/Services/DevC
 - [ ] **/fakeoffline [now] `<hours>`**: Stages or immediately simulates `<hours>` of offline income.
 - [ ] **/equipbest**: Automatically equips best damage sword and places top remaining swords onto pedestals.
 - [ ] **/econ [extended] [expected] [scope N] [goldMult] [luckMult] [critFeverFactor]**: Runs comprehensive economy and progression simulation across all 29 Dice tiers, or calculates expected Grade/Enchant multipliers.
+- [ ] **/gems `<amount>` / /gems +`<amount>`**: Sets or adds arbitrary Gems amounts for testing appraisals.
+- [ ] **/setgrade `<inventoryIndex>` `<grade>`**: Sets specific grade on sword in inventory for testing multipliers and badges.
+- [ ] **/gradetest [n]**: Simulates n rolls against Config/Grades and prints distribution and percentage vs expected odds to Output.
 
 > **Production Safeguard:** Verify that `DevCommands.luau` and `ServerScriptService/EconSim.luau` include Studio-only gating or are removed before production builds.
 

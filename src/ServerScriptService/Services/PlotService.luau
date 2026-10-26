@@ -903,9 +903,9 @@ function PlotService.Start()
 		end)
 	end
 
-	-- Listen for PlacedSwords or PedestalSlots updates to refresh pedestal attributes
+	-- Listen for PlacedSwords, PedestalSlots, or OwnedSwords updates to refresh pedestal attributes
 	DataService.Changed:Connect(function(player: Player, key: string, _value: any)
-		if key == "PlacedSwords" or key == "PedestalSlots" then
+		if key == "PlacedSwords" or key == "PedestalSlots" or key == "OwnedSwords" then
 			refreshPedestals(player)
 		end
 	end)

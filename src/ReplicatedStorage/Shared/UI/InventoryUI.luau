@@ -11,6 +11,7 @@ local NumberFormat = require(Shared:WaitForChild("NumberFormat"))
 local SalePrice = require(Shared:WaitForChild("SalePrice"))
 local Config = ReplicatedStorage:WaitForChild("Config")
 local Swords = require(Config:WaitForChild("Swords"))
+local Grades = require(Config:WaitForChild("Grades"))
 local GameConfig = require(Config:WaitForChild("Game"))
 local Assets = require(Config:WaitForChild("Assets"))
 
@@ -18,6 +19,7 @@ local Components = Shared:WaitForChild("UI"):WaitForChild("Components")
 local Popup = require(Components:WaitForChild("Popup"))
 local Button = require(Components:WaitForChild("Button"))
 local Panel = require(Components:WaitForChild("Panel"))
+local GradeBadge = require(Components:WaitForChild("GradeBadge"))
 
 export type OwnedSwordEntry = {
 	uid: string,
@@ -220,7 +222,7 @@ function InventoryUI.new(parentGui: Instance): InventoryUIInstance
 
 	local inspName = Instance.new("TextLabel")
 	inspName.Name = "InspName"
-	inspName.Size = UDim2.new(1, 0, 0, 24)
+	inspName.Size = UDim2.new(1, -34, 0, 24)
 	inspName.Position = UDim2.new(0, 0, 0, 0)
 	inspName.BackgroundTransparency = 1
 	inspName.Font = Theme.Fonts.Title
@@ -229,6 +231,14 @@ function InventoryUI.new(parentGui: Instance): InventoryUIInstance
 	inspName.TextTruncate = Enum.TextTruncate.AtEnd
 	inspName.Text = "Select a Sword"
 	inspName.Parent = inspContent
+
+	local inspGradeBadge = GradeBadge.new({
+		Grade = nil,
+		Size = UDim2.new(0, 28, 0, 20),
+		Position = UDim2.new(1, 0, 0, 2),
+		AnchorPoint = Vector2.new(1, 0),
+		Parent = inspContent,
+	})
 
 	local inspRarity = Instance.new("TextLabel")
 	inspRarity.Name = "InspRarity"
@@ -686,6 +696,18 @@ function InventoryUI.new(parentGui: Instance): InventoryUIInstance
 				lockIcon.Parent = lockBadge
 			end
 
+			-- Grade badge on top-right if sword has a grade
+			if typeof(entry.grade) == "string" and entry.grade ~= "" then
+				GradeBadge.new({
+					Grade = entry.grade,
+					Size = UDim2.new(0, 22, 0, 16),
+					Position = UDim2.new(1, -2, 0, 2),
+					AnchorPoint = Vector2.new(1, 0),
+					Parent = card,
+					ZIndex = 6,
+				})
+			end
+
 			btn.Activated:Connect(function()
 				selectedUid = entry.uid
 				rebuildGrid()
@@ -728,6 +750,7 @@ function InventoryUI.new(parentGui: Instance): InventoryUIInstance
 			inspDamage.Text = ""
 			inspSellValue.Text = ""
 			inspStatus.Text = ""
+			GradeBadge.Update(inspGradeBadge, nil)
 			equipButton:SetEnabled(false)
 			lockButton:SetEnabled(false)
 			sellButton:SetEnabled(false)
@@ -753,7 +776,20 @@ function InventoryUI.new(parentGui: Instance): InventoryUIInstance
 		inspName.TextColor3 = rarityColor
 		inspRarity.Text = ("%s (1 in %s)"):format(rarityName:upper(), swordDef and NumberFormat.format(swordDef.baseOdds) or "?")
 		inspRarity.TextColor3 = rarityColor
-		inspDamage.Text = ("Base Damage: %s Gold/Tap"):format(swordDef and NumberFormat.format(swordDef.baseDamage) or "1")
+
+		GradeBadge.Update(inspGradeBadge, selectedEntry.grade)
+
+		local gradeMult = Grades.GetMultiplier(selectedEntry.grade)
+		if swordDef and gradeMult > 1 then
+			local effectiveDmg = math.floor((swordDef.baseDamage * gradeMult) + 0.5)
+			inspDamage.Text = ("Damage: %s Gold/Tap (%s x%.2f)"):format(
+				NumberFormat.format(effectiveDmg),
+				selectedEntry.grade or "",
+				gradeMult
+			)
+		else
+			inspDamage.Text = ("Base Damage: %s Gold/Tap"):format(swordDef and NumberFormat.format(swordDef.baseDamage) or "1")
+		end
 		inspSellValue.Text = ("Sell Value: +%s Gold"):format(NumberFormat.format(salePrice))
 
 		lockButton:SetEnabled(true)

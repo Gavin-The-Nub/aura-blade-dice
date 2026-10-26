@@ -74,13 +74,24 @@ local Stations: StationsConfig = {
 			HasModel = true,
 			Group = "Plaza",
 		},
-	},
-	TrialGroundsMarkers = {
-		-- Reserved marker for Trial-side group (near Trials): no world model generated in S1
-		TrialGroupReserved = {
+		Appraiser = {
 			Type = "Appraiser",
 			ActionText = "Appraise",
 			ObjectText = "Master Appraiser",
+			-- South of SpawnLocation, clear of plots and pedestal prompts
+			Position = Vector3.new(0, 1.5, 22),
+			Size = Vector3.new(8, 2, 8),
+			ColorToken = "AuraPurple",
+			HasModel = true,
+			Group = "Plaza",
+		},
+	},
+	TrialGroundsMarkers = {
+		-- Reserved marker for Trial-side group: will be moved here in later phase
+		TrialGroupReserved = {
+			Type = "Enchanter",
+			ActionText = "Enchant",
+			ObjectText = "Enchanter",
 			Position = Vector3.new(0, 1.5, 120),
 			Size = Vector3.new(8, 2, 8),
 			ColorToken = "AuraPurple",

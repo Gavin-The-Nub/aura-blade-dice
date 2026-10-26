@@ -23,6 +23,7 @@ local EVENTS: { string } = {
 	"AutoRollStateChanged", -- server -> client: (isEnabled: boolean)
 	"SetAutoSellRule", -- client -> server: (rarity: string, enabled: boolean)
 	"PlotAssigned", -- server -> client: (plotId: number?, plotModel: Instance?)
+	"AutoGradeProgress", -- server -> client: (uid: string, rollsDone: number, gemsSpent: number, lastGrade: string, isRunning: boolean, stopReason: string?)
 }
 local FUNCTIONS: { string } = {
 	"GetInitialData", -- client -> server: () -> DataTemplate.PlayerData?
@@ -38,6 +39,9 @@ local FUNCTIONS: { string } = {
 	"ToggleLock", -- client -> server: (uid: string) -> (boolean, boolean?, string?)
 	"GetSellAllPreview", -- client -> server: () -> (boolean, any?, string?)
 	"SellAll", -- client -> server: (token: string) -> (boolean, number?, number?, string?)
+	"RollGrade", -- client -> server: (uid: string) -> (boolean, string?, string?, number?, string?)
+	"StartAutoGrade", -- client -> server: (uid: string, targetGrade: string) -> (boolean, string?)
+	"StopAutoGrade", -- client -> server: () -> (boolean, string?)
 }
 
 local Remotes = {}
