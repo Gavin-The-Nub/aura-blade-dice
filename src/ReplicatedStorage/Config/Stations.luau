@@ -85,6 +85,17 @@ local Stations: StationsConfig = {
 			HasModel = true,
 			Group = "Plaza",
 		},
+		Enchanter = {
+			Type = "Enchanter",
+			ActionText = "Enchant",
+			ObjectText = "Enchanter",
+			-- South-East of SpawnLocation, clear of Shop (20, 1.5, -10) and Appraiser (0, 1.5, 22)
+			Position = Vector3.new(20, 1.5, 10),
+			Size = Vector3.new(8, 2, 8),
+			ColorToken = "AuraPurple",
+			HasModel = true,
+			Group = "Plaza",
+		},
 	},
 	TrialGroundsMarkers = {
 		-- Reserved marker for Trial-side group: will be moved here in later phase
@@ -102,12 +113,14 @@ local Stations: StationsConfig = {
 	AllStations = {} :: { [StationType]: StationDef },
 }
 
--- Populate AllStations map for quick lookup by StationType
+-- Populate AllStations map for quick lookup by StationType (Plaza takes precedence)
 for _, def in Stations.PlazaStations do
 	Stations.AllStations[def.Type] = def
 end
 for _, def in Stations.TrialGroundsMarkers do
-	Stations.AllStations[def.Type] = def
+	if not Stations.AllStations[def.Type] then
+		Stations.AllStations[def.Type] = def
+	end
 end
 
 return Stations

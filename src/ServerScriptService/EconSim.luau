@@ -10,6 +10,8 @@ local RunService = game:GetService("RunService")
 local GameConfig = require(ReplicatedStorage.Config.Game)
 local Dice = require(ReplicatedStorage.Config.Dice)
 local Swords = require(ReplicatedStorage.Config.Swords)
+local Grades = require(ReplicatedStorage.Config.Grades)
+local Enchants = require(ReplicatedStorage.Config.Enchants)
 local NumberFormat = require(ReplicatedStorage.Shared.NumberFormat)
 
 export type SimulationSword = {
@@ -126,30 +128,18 @@ EconSim.SupplyAssumptions = SupplyAssumptions
 local BUDGET_A = 30 * 150 * 50 -- 225,000x (GDD max: Grade 30 x Enchant 150 x Rebirth Gold 50)
 local BUDGET_B = 25 * 15 * 2.5 -- 937.5x (Anime Dice reference: Grade 25 x Trait 15 x Rebirth 2.5)
 
--- Roll tables for Grades (Master Appraiser) and Enchants (Enchanter) from GDD
-local GDD_GRADES = {
-	{ name = "D", chance = 0.35, mult = 1.0 },
-	{ name = "C", chance = 0.25, mult = 1.25 },
-	{ name = "B", chance = 0.18, mult = 1.5 },
-	{ name = "A", chance = 0.12, mult = 2.0 },
-	{ name = "S", chance = 0.065, mult = 3.0 },
-	{ name = "SS", chance = 0.025, mult = 5.0 },
-	{ name = "SSS", chance = 0.0085, mult = 8.5 },
-	{ name = "Z", chance = 0.0014, mult = 15.0 },
-	{ name = "Z+", chance = 0.0001, mult = 30.0 },
-}
-
-local GDD_ENCHANTS = {
-	{ name = "Sharpness", chance = 0.40, mult = 1.2 },
-	{ name = "Berserker", chance = 0.25, mult = 1.6 },
-	{ name = "Vampiric", chance = 0.15, mult = 2.2 },
-	{ name = "Executioner", chance = 0.10, mult = 3.5 },
-	{ name = "Ronin", chance = 0.06, mult = 6.0 },
-	{ name = "Sovereign", chance = 0.028, mult = 12.0 },
-	{ name = "Transcendent", chance = 0.01, mult = 28.0 },
-	{ name = "Genesis", chance = 0.0018, mult = 75.0 },
-	{ name = "Singularity", chance = 0.0002, mult = 150.0 },
-}
+-- Helper to build roll probability tables directly from Config modules (single source of truth)
+local function getRollTableFromConfig(items: { any }): { { name: string, chance: number, mult: number } }
+	local result = {}
+	for _, item in ipairs(items) do
+		table.insert(result, {
+			name = item.name,
+			chance = item.rollChance / 100,
+			mult = item.multiplier,
+		})
+	end
+	return result
+end
 
 local function formatDuration(seconds: number): string
 	if seconds <= 0 then
@@ -822,8 +812,8 @@ function EconSim.PrintExpected(player: Player?): { [string]: any }
 	print("  (Mathematical expected values for 1 roll and Best-of-N independent rolls)")
 	print(string.rep("=", 95))
 
-	local gradeResults = analyzeRollDistribution("BLADE GRADES (Master Appraiser, 1 Gem/roll)", GDD_GRADES)
-	local enchantResults = analyzeRollDistribution("SWORD ENCHANTS (Enchanter, 1 Token/roll)", GDD_ENCHANTS)
+	local gradeResults = analyzeRollDistribution("BLADE GRADES (Master Appraiser, 1 Gem/roll)", getRollTableFromConfig(Grades.GetAll()))
+	local enchantResults = analyzeRollDistribution("SWORD ENCHANTS (Enchanter, 1 Token/roll)", getRollTableFromConfig(Enchants.GetAll()))
 
 	print("\n  [COMBINED EXPECTED MULTIPLIERS] (Grade x Enchant):")
 	print("  " .. string.rep("-", 60))

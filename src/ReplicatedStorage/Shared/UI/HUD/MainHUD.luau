@@ -23,6 +23,7 @@ export type MainHUDInstance = {
 	Gui: ScreenGui,
 	UpdateGold: (self: MainHUDInstance, amount: number) -> (),
 	UpdateGems: (self: MainHUDInstance, amount: number) -> (),
+	UpdateTokens: (self: MainHUDInstance, amount: number) -> (),
 	UpdateFever: (self: MainHUDInstance, points: number, maxPoints: number, isActive: boolean, durationRemaining: number) -> (),
 	SetAutoTapState: (self: MainHUDInstance, isEnabled: boolean) -> (),
 	SetAutoRollState: (self: MainHUDInstance, isEnabled: boolean) -> (),
@@ -298,12 +299,28 @@ function MainHUD.new(parentGui: Instance): MainHUDInstance
 	goldStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Contextual
 	goldStroke.Parent = goldLabel
 
-	-- 2b. Gems Counter: Directly above Gold counter
+	-- 2b. Gems & Tokens Counter: Directly above Gold counter
+	local currencyRow = Instance.new("Frame")
+	currencyRow.Name = "CurrencyRow"
+	currencyRow.Size = UDim2.new(0, 360, 0, 32)
+	currencyRow.Position = UDim2.new(0, 24, 1, -74)
+	currencyRow.AnchorPoint = Vector2.new(0, 1)
+	currencyRow.BackgroundTransparency = 1
+	currencyRow.ZIndex = 5
+	currencyRow.Parent = root
+
+	local currencyLayout = Instance.new("UIListLayout")
+	currencyLayout.FillDirection = Enum.FillDirection.Horizontal
+	currencyLayout.SortOrder = Enum.SortOrder.LayoutOrder
+	currencyLayout.Padding = UDim.new(0, 16)
+	currencyLayout.VerticalAlignment = Enum.VerticalAlignment.Bottom
+	currencyLayout.Parent = currencyRow
+
 	local gemsLabel = Instance.new("TextLabel")
 	gemsLabel.Name = "GemsAmount"
-	gemsLabel.Size = UDim2.new(0, 360, 0, 32)
-	gemsLabel.Position = UDim2.new(0, 24, 1, -74)
-	gemsLabel.AnchorPoint = Vector2.new(0, 1)
+	gemsLabel.LayoutOrder = 1
+	gemsLabel.Size = UDim2.new(0, 0, 1, 0)
+	gemsLabel.AutomaticSize = Enum.AutomaticSize.X
 	gemsLabel.BackgroundTransparency = 1
 	gemsLabel.Text = "💎 0"
 	gemsLabel.TextColor3 = Theme.Colors.AuraCyan
@@ -313,13 +330,35 @@ function MainHUD.new(parentGui: Instance): MainHUDInstance
 	gemsLabel.TextSize = 26
 	gemsLabel.Font = Theme.Fonts.Number
 	gemsLabel.ZIndex = 5
-	gemsLabel.Parent = root
+	gemsLabel.Parent = currencyRow
 
 	local gemsStroke = Instance.new("UIStroke")
 	gemsStroke.Color = Theme.TextStroke.Color
 	gemsStroke.Thickness = Theme.TextStroke.Thickness
 	gemsStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Contextual
 	gemsStroke.Parent = gemsLabel
+
+	local tokensLabel = Instance.new("TextLabel")
+	tokensLabel.Name = "TokensAmount"
+	tokensLabel.LayoutOrder = 2
+	tokensLabel.Size = UDim2.new(0, 0, 1, 0)
+	tokensLabel.AutomaticSize = Enum.AutomaticSize.X
+	tokensLabel.BackgroundTransparency = 1
+	tokensLabel.Text = "🎟️ 0"
+	tokensLabel.TextColor3 = Theme.Colors.AuraPurple
+	tokensLabel.TextXAlignment = Enum.TextXAlignment.Left
+	tokensLabel.TextYAlignment = Enum.TextYAlignment.Bottom
+	tokensLabel.TextScaled = false
+	tokensLabel.TextSize = 26
+	tokensLabel.Font = Theme.Fonts.Number
+	tokensLabel.ZIndex = 5
+	tokensLabel.Parent = currencyRow
+
+	local tokensStroke = Instance.new("UIStroke")
+	tokensStroke.Color = Theme.TextStroke.Color
+	tokensStroke.Thickness = Theme.TextStroke.Thickness
+	tokensStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Contextual
+	tokensStroke.Parent = tokensLabel
 
 
 
@@ -1045,6 +1084,9 @@ function MainHUD.new(parentGui: Instance): MainHUDInstance
 		end,
 		UpdateGems = function(_, amount: number)
 			gemsLabel.Text = "💎 " .. NumberFormat.format(amount)
+		end,
+		UpdateTokens = function(_, amount: number)
+			tokensLabel.Text = "🎟️ " .. NumberFormat.format(amount)
 		end,
 		UpdateFever = function(_, points: number, maxPoints: number, isActive: boolean, durationRemaining: number)
 			updateFeverDisplay(points, maxPoints, isActive, durationRemaining)

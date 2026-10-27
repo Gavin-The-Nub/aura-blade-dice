@@ -41,20 +41,21 @@ Out (do NOT build): Relic Accessories (removed), splash damage (removed, there i
 
 ```
 ReplicatedStorage/
-  Config/        -- Assets, DataTemplate, Dice, Game, Grades, Stations, Swords; Enchants/Blessings/Rebirths/Trials/Events (planned)
+  Config/        -- Assets, DataTemplate, Dice, Enchants, Game, Grades, Stations, Swords; Blessings/Rebirths/Trials/Events (planned)
   Shared/        -- NumberFormat, Remotes, Theme; WeightedRandom (planned)
-    UI/          -- InventoryUI, MerchantUI, OfflineIncomePopup, SellStallUI, ShopUI, SwordSelectorPopup
-      Components/-- Button, Panel, Popup
+    UI/          -- AppraiserUI, EnchanterUI, InventoryUI, MerchantUI, OfflineIncomePopup, SellStallUI, ShopUI, SwordSelectorPopup
+      Components/-- Badge, Button, EnchantBadge, GradeBadge, Panel, Popup
       HUD/       -- MainHUD
 ServerScriptService/
   Main (Script)  -- starts all services
   PlayerActionLock (ModuleScript) -- lives at ServerScriptService/PlayerActionLock (not in Services/)
-  EconSim (ModuleScript) -- lives at ServerScriptService/EconSim (not in Services/)
-  Services/      -- DataService, DevCommands, InventoryService (Equip, Equip Best, Sell, Sell All, Lock), MerchantService, PlotService, RollService, StationService, TapService; RebirthService (planned), TrialService (planned), EventService (planned)
+  AutoRollRunner (ModuleScript)   -- lives at ServerScriptService/AutoRollRunner (not in Services/)
+  EconSim (ModuleScript)          -- lives at ServerScriptService/EconSim (not in Services/)
+  Services/      -- AppraiserService, DataService, DevCommands, EnchanterService, InventoryService (Equip, Equip Best, Sell, Sell All, Lock), MerchantService, PlotService, RollService, StationService, TapService; RebirthService (planned), TrialService (planned), EventService (planned)
 StarterPlayer/
   StarterPlayerScripts/
-    Controllers/ -- DevFeedback, HUDController, InventoryController, MerchantController, PlotController, RollController, SellStallController, ShopController, StationController, TapController, TargetDummyController
-Workspace/       -- World map & interaction zones: Personal Plots (Dummies, Pedestals), Stations (Plaza: Dice Merchant, Sell Stall [Sell All, Lock, single sell], Shop [placeholder]; Near Trials: Master Appraiser [planned], Enchanter [planned], Runesmith [planned])
+    Controllers/ -- AppraiserController, DevFeedback, EnchanterController, HUDController, InventoryController, MerchantController, PlotController, RollController, SellStallController, ShopController, StationController, TapController, TargetDummyController
+Workspace/       -- World map & interaction zones: Personal Plots (Dummies, Pedestals), Stations (Plaza: Dice Merchant, Sell Stall [Sell All, Lock, single sell], Shop [placeholder], Master Appraiser, Enchanter; Near Trials: Runesmith [planned])
 ```
 
 **Script Sync Rule:** Only create folders inside folders that are already synced (`Config`, `Shared`, `Services`, `Controllers`). If you ever need a new top-level folder, ask the user first so they can link it with Script Sync.
@@ -102,5 +103,7 @@ Costs reach Septillion scale. Use normal Luau numbers (doubles). Always display 
 - **Dual Wielding:** Needs two equipped swords, but the codebase and player data model currently assume a single `EquippedSword`.
 - **Rebirth Multipliers & Costs:** Multipliers and Gold costs in Config and GDD are unverified placeholders until confirmed against Anime Dice.
 - **Sword List Content:** The sword list in `Config/Swords` is too short for the high-Luck dice (players with top-tier dice will roll beyond the highest-rarity swords currently defined).
-- **Sword Grade & Enchant Field Names & Multipliers:** Grade and Enchant fields on sword data entries are named lowercase `grade` and `enchant` (strings), read by `InventoryService.GetSellAllPreview` and `SellStallUI` for warnings. `TapService.CalculateSwordGoldPerTap` and `PlotService.refreshPedestals` read the grade multiplier from `Config/Grades`. **Note on SalePrice:** `Shared/SalePrice.luau` intentionally calculates sword sale prices based on base damage only (grade multiplier is disabled / set to 1.0) to avoid an unintended Gem-to-Gold loop until full economy tuning is complete.
+- **Sword Grade & Enchant Field Names & Multipliers:** Grade and Enchant fields on sword data entries are named lowercase `grade` and `enchant` (strings), read by `InventoryService.GetSellAllPreview` and `SellStallUI` for warnings. `TapService.CalculateSwordGoldPerTap` and `PlotService.refreshPedestals` read the grade multiplier from `Config/Grades` and the enchant Gold multiplier from `Config/Enchants`. **Note on SalePrice:** `Shared/SalePrice.luau` intentionally calculates sword sale prices based on base damage only (grade and enchant multipliers are disabled / set to 1.0) to avoid an unintended Gem/Token-to-Gold loop until full economy tuning is complete.
+- **Enchant Tokens In-Game Source:** `EnchantTokens` currency has no real gameplay source until Trials and Golden Rush central arena events are implemented; currently testing uses the Studio `/tokens` dev command.
+- **Enchant Non-Gold Passive Effects:** Non-Gold passive enchant effects defined in GDD section 5B (swing speed, crit chance, Fever charge rate, boss damage, luck buffs, and Transcendent every-3rd-tap bonus) are stored as metadata in `Config/Enchants.luau` and shown in the UI, but are NOT applied to gameplay mechanics yet (this build applies Gold multiplier ONLY).
 - **Economy Simulation - Sell Income:** Sword sale Gold income (single sell, Sell All, and Auto-Sell) is not yet modeled in `ServerScriptService/EconSim.luau`; `Game.Selling.BaseDamageMultiplier = 10` is a placeholder pending EconSim integration.

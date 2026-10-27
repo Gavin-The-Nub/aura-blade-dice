@@ -12,6 +12,7 @@ local SalePrice = require(Shared:WaitForChild("SalePrice"))
 local Config = ReplicatedStorage:WaitForChild("Config")
 local Swords = require(Config:WaitForChild("Swords"))
 local Grades = require(Config:WaitForChild("Grades"))
+local Enchants = require(Config:WaitForChild("Enchants"))
 local GameConfig = require(Config:WaitForChild("Game"))
 local Assets = require(Config:WaitForChild("Assets"))
 
@@ -20,6 +21,7 @@ local Popup = require(Components:WaitForChild("Popup"))
 local Button = require(Components:WaitForChild("Button"))
 local Panel = require(Components:WaitForChild("Panel"))
 local GradeBadge = require(Components:WaitForChild("GradeBadge"))
+local EnchantBadge = require(Components:WaitForChild("EnchantBadge"))
 
 export type OwnedSwordEntry = {
 	uid: string,
@@ -222,7 +224,7 @@ function InventoryUI.new(parentGui: Instance): InventoryUIInstance
 
 	local inspName = Instance.new("TextLabel")
 	inspName.Name = "InspName"
-	inspName.Size = UDim2.new(1, -34, 0, 24)
+	inspName.Size = UDim2.new(1, -110, 0, 24)
 	inspName.Position = UDim2.new(0, 0, 0, 0)
 	inspName.BackgroundTransparency = 1
 	inspName.Font = Theme.Fonts.Title
@@ -236,6 +238,14 @@ function InventoryUI.new(parentGui: Instance): InventoryUIInstance
 		Grade = nil,
 		Size = UDim2.new(0, 28, 0, 20),
 		Position = UDim2.new(1, 0, 0, 2),
+		AnchorPoint = Vector2.new(1, 0),
+		Parent = inspContent,
+	})
+
+	local inspEnchantBadge = EnchantBadge.new({
+		Enchant = nil,
+		Size = UDim2.new(0, 68, 0, 20),
+		Position = UDim2.new(1, -32, 0, 2),
 		AnchorPoint = Vector2.new(1, 0),
 		Parent = inspContent,
 	})
@@ -697,7 +707,8 @@ function InventoryUI.new(parentGui: Instance): InventoryUIInstance
 			end
 
 			-- Grade badge on top-right if sword has a grade
-			if typeof(entry.grade) == "string" and entry.grade ~= "" then
+			local hasGrade = typeof(entry.grade) == "string" and entry.grade ~= ""
+			if hasGrade then
 				GradeBadge.new({
 					Grade = entry.grade,
 					Size = UDim2.new(0, 22, 0, 16),
@@ -705,6 +716,19 @@ function InventoryUI.new(parentGui: Instance): InventoryUIInstance
 					AnchorPoint = Vector2.new(1, 0),
 					Parent = card,
 					ZIndex = 6,
+				})
+			end
+
+			-- Enchant badge on top-right (below Grade badge if graded, else top-right)
+			if typeof(entry.enchant) == "string" and entry.enchant ~= "" then
+				EnchantBadge.new({
+					Enchant = entry.enchant,
+					Size = UDim2.new(0, 48, 0, 15),
+					Position = if hasGrade then UDim2.new(1, -2, 0, 20) else UDim2.new(1, -2, 0, 2),
+					AnchorPoint = Vector2.new(1, 0),
+					Parent = card,
+					ZIndex = 6,
+					TextSize = 9,
 				})
 			end
 
@@ -751,6 +775,7 @@ function InventoryUI.new(parentGui: Instance): InventoryUIInstance
 			inspSellValue.Text = ""
 			inspStatus.Text = ""
 			GradeBadge.Update(inspGradeBadge, nil)
+			EnchantBadge.Update(inspEnchantBadge, nil)
 			equipButton:SetEnabled(false)
 			lockButton:SetEnabled(false)
 			sellButton:SetEnabled(false)
@@ -778,15 +803,36 @@ function InventoryUI.new(parentGui: Instance): InventoryUIInstance
 		inspRarity.TextColor3 = rarityColor
 
 		GradeBadge.Update(inspGradeBadge, selectedEntry.grade)
+		EnchantBadge.Update(inspEnchantBadge, selectedEntry.enchant)
 
 		local gradeMult = Grades.GetMultiplier(selectedEntry.grade)
-		if swordDef and gradeMult > 1 then
-			local effectiveDmg = math.floor((swordDef.baseDamage * gradeMult) + 0.5)
-			inspDamage.Text = ("Damage: %s Gold/Tap (%s x%.2f)"):format(
-				NumberFormat.format(effectiveDmg),
-				selectedEntry.grade or "",
-				gradeMult
-			)
+		local enchantMult = Enchants.GetMultiplier(selectedEntry.enchant)
+		local totalMult = gradeMult * enchantMult
+
+		if swordDef and totalMult > 1 then
+			local effectiveDmg = math.floor((swordDef.baseDamage * totalMult) + 0.5)
+			if gradeMult > 1 and enchantMult > 1 then
+				inspDamage.Text = ("Damage: %s Gold/Tap (Total x%.2f: %s x%.2f, %s x%.2f)"):format(
+					NumberFormat.format(effectiveDmg),
+					totalMult,
+					selectedEntry.grade or "",
+					gradeMult,
+					selectedEntry.enchant or "",
+					enchantMult
+				)
+			elseif gradeMult > 1 then
+				inspDamage.Text = ("Damage: %s Gold/Tap (%s x%.2f)"):format(
+					NumberFormat.format(effectiveDmg),
+					selectedEntry.grade or "",
+					gradeMult
+				)
+			else
+				inspDamage.Text = ("Damage: %s Gold/Tap (%s x%.2f)"):format(
+					NumberFormat.format(effectiveDmg),
+					selectedEntry.enchant or "",
+					enchantMult
+				)
+			end
 		else
 			inspDamage.Text = ("Base Damage: %s Gold/Tap"):format(swordDef and NumberFormat.format(swordDef.baseDamage) or "1")
 		end

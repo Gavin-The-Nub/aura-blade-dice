@@ -20,8 +20,11 @@ The following commands are implemented in `src/ServerScriptService/Services/DevC
 - [ ] **/equipbest**: Automatically equips best damage sword and places top remaining swords onto pedestals.
 - [ ] **/econ [extended] [expected] [scope N] [goldMult] [luckMult] [critFeverFactor]**: Runs comprehensive economy and progression simulation across all 29 Dice tiers, or calculates expected Grade/Enchant multipliers.
 - [ ] **/gems `<amount>` / /gems +`<amount>`**: Sets or adds arbitrary Gems amounts for testing appraisals.
+- [ ] **/tokens `<amount>` / /tokens +`<amount>`**: Sets or adds arbitrary EnchantTokens amounts for testing enchants.
 - [ ] **/setgrade `<inventoryIndex>` `<grade>`**: Sets specific grade on sword in inventory for testing multipliers and badges.
+- [ ] **/setenchant `<inventoryIndex>` `<name>`**: Sets specific enchant on sword in inventory for testing multipliers and badges.
 - [ ] **/gradetest [n]**: Simulates n rolls against Config/Grades and prints distribution and percentage vs expected odds to Output.
+- [ ] **/enchanttest [n]**: Simulates n rolls against Config/Enchants and prints distribution and percentage vs expected odds to Output.
 
 > **Production Safeguard:** Verify that `DevCommands.luau` and `ServerScriptService/EconSim.luau` include Studio-only gating or are removed before production builds.
 

@@ -18,6 +18,7 @@ local PlotService = require(ServerScriptService.Services.PlotService)
 local InventoryService = require(ServerScriptService.Services.InventoryService)
 local Dice = require(ReplicatedStorage.Config.Dice)
 local Grades = require(ReplicatedStorage.Config.Grades)
+local Enchants = require(ReplicatedStorage.Config.Enchants)
 local NumberFormat = require(ReplicatedStorage.Shared.NumberFormat)
 local Remotes = require(ReplicatedStorage.Shared.Remotes)
 local EconSim = require(ServerScriptService.EconSim)
@@ -154,6 +155,110 @@ local function onGradeTestCommand(originTextSource: TextSource, unfilteredText: 
 		local actual = (c / count) * 100
 		local exp = def.rollChance
 		print(("[DevCommands] Grade %-4s : %6d (%6.2f%%) | Expected: %6.2f%% (x%.2f)"):format(
+			def.name,
+			c,
+			actual,
+			exp,
+			def.multiplier
+		))
+	end
+end
+
+local function onTokensCommand(originTextSource: TextSource, unfilteredText: string)
+	local player = Players:GetPlayerByUserId(originTextSource.UserId)
+	if player == nil then
+		return
+	end
+
+	local arg = unfilteredText:match("^%S+%s+(%S+)")
+	local amount = tonumber(arg)
+	if arg == nil or amount == nil then
+		say(player, "Usage: /tokens <amount>  or  /tokens +<amount>")
+		return
+	end
+
+	local ok
+	if arg:sub(1, 1) == "+" then
+		ok = DataService.Increment(player, "EnchantTokens", amount)
+	else
+		ok = DataService.Set(player, "EnchantTokens", amount)
+	end
+
+	local tokens = DataService.Get(player, "EnchantTokens")
+	if ok and type(tokens) == "number" then
+		say(player, ("EnchantTokens is now %s (%d)"):format(NumberFormat.format(tokens), tokens))
+	else
+		say(player, "/tokens rejected (data not loaded yet, or invalid value)")
+	end
+end
+
+local function onSetEnchantCommand(originTextSource: TextSource, unfilteredText: string)
+	local player = Players:GetPlayerByUserId(originTextSource.UserId)
+	if player == nil then
+		return
+	end
+
+	local idxStr, enchantArg = unfilteredText:match("^%S+%s+(%S+)%s*(%S*)")
+	local index = tonumber(idxStr)
+	if not index or index < 1 then
+		say(player, "Usage: /setenchant <inventoryIndex> <enchant>")
+		return
+	end
+
+	local enchant = enchantArg or ""
+	if enchant ~= "" and not Enchants.GetEnchantDef(enchant) then
+		say(player, ("Invalid enchant '%s'. Valid enchants: Sharpness, Berserker, Vampiric, Executioner, Ronin, Sovereign, Transcendent, Genesis, Singularity (or empty string for none)"):format(enchant))
+		return
+	end
+
+	local owned = DataService.Get(player, "OwnedSwords")
+	if type(owned) ~= "table" or not owned[index] then
+		say(player, ("Inventory index %d out of bounds (you have %d swords)"):format(index, type(owned) == "table" and #owned or 0))
+		return
+	end
+
+	local updated = table.clone(owned)
+	local entry = table.clone(updated[index])
+	entry.enchant = if enchant ~= "" then enchant else ""
+	updated[index] = entry
+
+	local ok = DataService.Set(player, "OwnedSwords", updated)
+	if ok then
+		say(player, ("Sword #%d (%s) enchant set to: %s"):format(index, entry.id or "sword", if enchant ~= "" then enchant else "None"))
+	else
+		say(player, "/setenchant failed to save.")
+	end
+end
+
+local function onEnchantTestCommand(originTextSource: TextSource, unfilteredText: string)
+	local player = Players:GetPlayerByUserId(originTextSource.UserId)
+	if player == nil then
+		return
+	end
+
+	local arg = unfilteredText:match("^%S+%s+(%S+)")
+	local count = tonumber(arg) or 1000
+	if count <= 0 then
+		count = 1000
+	end
+
+	local counts: { [string]: number } = {}
+	for _, def in ipairs(Enchants.GetAll()) do
+		counts[def.name] = 0
+	end
+
+	for _ = 1, count do
+		local rolled = Enchants.RollRandomEnchant()
+		counts[rolled.name] = (counts[rolled.name] or 0) + 1
+	end
+
+	print(("[DevCommands] ====== Enchant Distribution Test (%d Rolls) ======"):format(count))
+	say(player, ("[EnchantTest] Simulating %d rolls against Config/Enchants... (check Output)"):format(count))
+	for _, def in ipairs(Enchants.GetAll()) do
+		local c = counts[def.name] or 0
+		local actual = (c / count) * 100
+		local exp = def.rollChance
+		print(("[DevCommands] Enchant %-14s : %6d (%6.2f%%) | Expected: %6.2f%% (x%.2f)"):format(
 			def.name,
 			c,
 			actual,
@@ -517,6 +622,24 @@ function DevCommands.Start()
 	gradeTestCommand.PrimaryAlias = "/gradetest"
 	gradeTestCommand.Triggered:Connect(onGradeTestCommand)
 	gradeTestCommand.Parent = TextChatService
+
+	local tokensCommand = Instance.new("TextChatCommand")
+	tokensCommand.Name = "DevTokensCommand"
+	tokensCommand.PrimaryAlias = "/tokens"
+	tokensCommand.Triggered:Connect(onTokensCommand)
+	tokensCommand.Parent = TextChatService
+
+	local setEnchantCommand = Instance.new("TextChatCommand")
+	setEnchantCommand.Name = "DevSetEnchantCommand"
+	setEnchantCommand.PrimaryAlias = "/setenchant"
+	setEnchantCommand.Triggered:Connect(onSetEnchantCommand)
+	setEnchantCommand.Parent = TextChatService
+
+	local enchantTestCommand = Instance.new("TextChatCommand")
+	enchantTestCommand.Name = "DevEnchantTestCommand"
+	enchantTestCommand.PrimaryAlias = "/enchanttest"
+	enchantTestCommand.Triggered:Connect(onEnchantTestCommand)
+	enchantTestCommand.Parent = TextChatService
 end
 
 return DevCommands

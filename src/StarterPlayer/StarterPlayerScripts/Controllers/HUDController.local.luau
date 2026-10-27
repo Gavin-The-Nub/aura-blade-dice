@@ -22,6 +22,8 @@ dataChangedRemote.OnClientEvent:Connect(function(key: unknown, value: unknown)
 		hud:UpdateGold(value)
 	elseif key == "Gems" and type(value) == "number" then
 		hud:UpdateGems(value)
+	elseif key == "EnchantTokens" and type(value) == "number" then
+		hud:UpdateTokens(value)
 	end
 end)
 
@@ -38,6 +40,9 @@ task.spawn(function()
 		if type(data.Gems) == "number" then
 			hud:UpdateGems(data.Gems)
 		end
+		if type(data.EnchantTokens) == "number" then
+			hud:UpdateTokens(data.EnchantTokens)
+		end
 	end
 end)
 
@@ -52,6 +57,7 @@ local ShopController = require(Controllers:WaitForChild("ShopController"))
 local SellStallController = require(Controllers:WaitForChild("SellStallController"))
 local StationController = require(Controllers:WaitForChild("StationController"))
 local AppraiserController = require(Controllers:WaitForChild("AppraiserController"))
+local EnchanterController = require(Controllers:WaitForChild("EnchanterController"))
 
 -- Initialize controllers with the HUD instance
 TapController.Init(hud)
@@ -64,6 +70,7 @@ ShopController.Init()
 SellStallController.Init()
 StationController.Init()
 AppraiserController.Init(playerGui)
+EnchanterController.Init(playerGui)
 
 hud:SetOnBackpack(function()
 	InventoryController.Toggle()

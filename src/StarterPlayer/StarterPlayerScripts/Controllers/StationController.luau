@@ -17,6 +17,7 @@ local InventoryController = require(Controllers:WaitForChild("InventoryControlle
 local ShopController = require(Controllers:WaitForChild("ShopController"))
 local SellStallController = require(Controllers:WaitForChild("SellStallController"))
 local AppraiserController = require(Controllers:WaitForChild("AppraiserController"))
+local EnchanterController = require(Controllers:WaitForChild("EnchanterController"))
 
 local STATION_TAG = "Station"
 local MAX_SCAN_RETRIES = 6
@@ -40,8 +41,10 @@ local function onStationTriggered(stationType: string)
 		ShopController.Open()
 	elseif stationType == "Appraiser" then
 		AppraiserController.Open()
+	elseif stationType == "Enchanter" then
+		EnchanterController.Open()
 	else
-		-- Reserved or future station types (Enchanter, Runesmith)
+		-- Reserved or future station types (Runesmith)
 		print(("[StationController] Station %s triggered (UI coming in a future update)."):format(stationType))
 	end
 end

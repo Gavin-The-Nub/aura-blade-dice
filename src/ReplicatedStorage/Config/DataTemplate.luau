@@ -15,6 +15,7 @@ export type PlayerData = {
 	Version: number, -- bump + migrate if the shape ever changes incompatibly
 	Gold: number,
 	Gems: number,
+	EnchantTokens: number,
 	Rebirths: number,
 	OwnedSwords: { OwnedSwordData }, -- sword entries with uid, id, and locked flag
 	EquippedSword: string, -- uid of equipped sword, or "" for nothing equipped
@@ -30,6 +31,7 @@ local DataTemplate: PlayerData = {
 	Version = 1,
 	Gold = 0,
 	Gems = 0,
+	EnchantTokens = 0,
 	Rebirths = 0,
 	OwnedSwords = {},
 	EquippedSword = "",

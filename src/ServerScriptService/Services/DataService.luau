@@ -31,6 +31,7 @@ local KICK_SESSION_ENDED = "Your data was opened on another server. Please rejoi
 local NON_NEGATIVE_KEYS: { [string]: boolean } = {
 	Gold = true,
 	Gems = true,
+	EnchantTokens = true,
 	Rebirths = true,
 	DiceTier = true,
 	LastLogout = true,
@@ -121,6 +122,13 @@ local function onPlayerAdded(player: Player)
 
 	profile:Reconcile() -- add any template fields this old profile is missing
 
+	-- Validate and clamp EnchantTokens to safe non-negative integer
+	if type(profile.Data.EnchantTokens) ~= "number" or profile.Data.EnchantTokens < 0 then
+		profile.Data.EnchantTokens = 0
+	else
+		profile.Data.EnchantTokens = math.floor(profile.Data.EnchantTokens)
+	end
+
 	-- Validate and clamp DiceTier between 1 and #Dice (preserving valid owned/equipped tiers)
 	local equipped = profile.Data.DiceTier
 	if type(equipped) ~= "number" or equipped < 1 then
@@ -159,11 +167,16 @@ local function onPlayerAdded(player: Player)
 		end
 	end
 
-	-- Migrate OwnedSwords: ensure every entry has a boolean locked field (default false)
+	-- Migrate OwnedSwords: ensure every entry has boolean locked and normalize non-string enchant to ""
 	if type(profile.Data.OwnedSwords) == "table" then
 		for _, entry in profile.Data.OwnedSwords do
-			if type(entry) == "table" and typeof(entry.locked) ~= "boolean" then
-				entry.locked = false
+			if type(entry) == "table" then
+				if typeof(entry.locked) ~= "boolean" then
+					entry.locked = false
+				end
+				if typeof(entry.enchant) ~= "string" then
+					entry.enchant = ""
+				end
 			end
 		end
 	else

@@ -10,6 +10,7 @@ local ServerScriptService = game:GetService("ServerScriptService")
 local GameConfig = require(ReplicatedStorage.Config.Game)
 local Swords = require(ReplicatedStorage.Config.Swords)
 local Grades = require(ReplicatedStorage.Config.Grades)
+local Enchants = require(ReplicatedStorage.Config.Enchants)
 local Remotes = require(ReplicatedStorage.Shared.Remotes)
 local DataService = require(ServerScriptService.Services.DataService)
 
@@ -61,12 +62,15 @@ function TapService.CalculateSwordGoldPerTap(player: Player, swordEntry: any): n
 		end
 	end
 
-	-- Multipliers (Grade from Config/Grades; Enchant and Rebirth are future placeholders)
+	-- Multipliers (Grade from Config/Grades; Enchant from Config/Enchants; Rebirth is future placeholder)
 	local gradeMult = 1.0
 	if type(swordEntry) == "table" and type(swordEntry.grade) == "string" then
 		gradeMult = Grades.GetMultiplier(swordEntry.grade)
 	end
-	local enchantMult = 1
+	local enchantMult = 1.0
+	if type(swordEntry) == "table" and type(swordEntry.enchant) == "string" then
+		enchantMult = Enchants.GetMultiplier(swordEntry.enchant)
+	end
 	local rebirthMult = 1
 
 	return baseDamage * gradeMult * enchantMult * rebirthMult

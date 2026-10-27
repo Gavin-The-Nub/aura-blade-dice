@@ -50,6 +50,11 @@ local Game = {
 		AutoInterval = 0.5, -- loop interval in seconds (clearly marked placeholder)
 		MinAutoInterval = 0.1, -- safety clamp to prevent runaway server loops
 	},
+	Enchanter = {
+		TokenCost = 1,
+		AutoInterval = 0.5, -- loop interval in seconds (clearly marked placeholder)
+		MinAutoInterval = 0.1, -- safety clamp to prevent runaway server loops
+	},
 }
 
 return Game
