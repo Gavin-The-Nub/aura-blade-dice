@@ -58,6 +58,7 @@ local SellStallController = require(Controllers:WaitForChild("SellStallControlle
 local StationController = require(Controllers:WaitForChild("StationController"))
 local AppraiserController = require(Controllers:WaitForChild("AppraiserController"))
 local EnchanterController = require(Controllers:WaitForChild("EnchanterController"))
+local RunesmithController = require(Controllers:WaitForChild("RunesmithController"))
 
 -- Initialize controllers with the HUD instance
 TapController.Init(hud)
@@ -71,6 +72,7 @@ SellStallController.Init()
 StationController.Init()
 AppraiserController.Init(playerGui)
 EnchanterController.Init(playerGui)
+RunesmithController.Init(playerGui)
 
 hud:SetOnBackpack(function()
 	InventoryController.Toggle()

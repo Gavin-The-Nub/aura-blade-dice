@@ -9,6 +9,7 @@ export type OwnedSwordData = {
 	locked: boolean?,
 	grade: string?,
 	enchant: string?,
+	blessing: string?,
 }
 
 export type PlayerData = {

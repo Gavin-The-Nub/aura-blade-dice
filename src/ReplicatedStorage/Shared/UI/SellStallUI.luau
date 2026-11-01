@@ -309,10 +309,10 @@ function SellStallUI.new(parentGui: Instance): SellStallUIInstance
 			previewStatsLabel.TextColor3 = Theme.Colors.TextGold
 
 			if currentPreview.gradedOrEnchantedCount > 0 then
-				previewWarningLabel.Text = ("⚠️ %d sword(s) have Grades or Enchants!"):format(currentPreview.gradedOrEnchantedCount)
+				previewWarningLabel.Text = ("⚠️ %d sword(s) have Grades, Enchants, or Blessings!"):format(currentPreview.gradedOrEnchantedCount)
 				previewWarningLabel.TextColor3 = Theme.Colors.AuraCrimson
 			else
-				previewWarningLabel.Text = "✓ No graded or enchanted swords in batch."
+				previewWarningLabel.Text = "✓ No upgraded swords in batch."
 				previewWarningLabel.TextColor3 = Theme.Colors.AuraEmerald
 			end
 
@@ -333,7 +333,7 @@ function SellStallUI.new(parentGui: Instance): SellStallUIInstance
 		)
 
 		if currentPreview.gradedOrEnchantedCount > 0 then
-			confirmWarningText.Text = ("⚠️ Warning: %d of these swords have a Grade or Enchant!"):format(currentPreview.gradedOrEnchantedCount)
+			confirmWarningText.Text = ("⚠️ Warning: %d of these swords have a Grade, Enchant, or Blessing!"):format(currentPreview.gradedOrEnchantedCount)
 		else
 			confirmWarningText.Text = ""
 		end

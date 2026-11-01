@@ -19,6 +19,7 @@ local InventoryService = require(ServerScriptService.Services.InventoryService)
 local Dice = require(ReplicatedStorage.Config.Dice)
 local Grades = require(ReplicatedStorage.Config.Grades)
 local Enchants = require(ReplicatedStorage.Config.Enchants)
+local Blessings = require(ReplicatedStorage.Config.Blessings)
 local NumberFormat = require(ReplicatedStorage.Shared.NumberFormat)
 local Remotes = require(ReplicatedStorage.Shared.Remotes)
 local GameConfig = require(ReplicatedStorage.Config.Game)
@@ -593,6 +594,122 @@ local function onEconCommand(originTextSource: TextSource, unfilteredText: strin
 	end
 end
 
+local function onBlessingCostCommand(originTextSource: TextSource, _unfilteredText: string)
+	local player = Players:GetPlayerByUserId(originTextSource.UserId)
+	if player == nil or not RunService:IsStudio() then
+		return
+	end
+
+	print("================================================================================")
+	print("[DevCommands] Hilt Blessing Roll Cost Table (Dice Tiers 1 to 12)")
+	print("Formula: cost = math.floor(math.max(MinCost, CostFraction * nextTierPrice))")
+	print(("Parameters: MinCost = %d Gold, CostFraction = %.4f"):format(Blessings.MinCost, Blessings.CostFraction))
+	print("--------------------------------------------------------------------------------")
+	print(string.format("%-5s | %-18s | %-16s | %-16s | %-14s", "Tier", "Dice Name", "Dice Cost", "Next Tier Cost", "Blessing Cost"))
+	print("--------------------------------------------------------------------------------")
+
+	for tier = 1, 12 do
+		local diceDef = Dice[tier]
+		local diceName = diceDef and diceDef.name or ("Tier " .. tier)
+		local diceCost = diceDef and diceDef.cost or 0
+		local cost, targetTier, targetPrice = Blessings.CalculateCost(tier)
+		print(string.format("%-5d | %-18s | %-16s | %-16s | %-14s",
+			tier,
+			diceName,
+			NumberFormat.format(diceCost) .. " Gold",
+			NumberFormat.format(targetPrice) .. " (T" .. targetTier .. ")",
+			NumberFormat.format(cost) .. " Gold"
+		))
+	end
+	print("================================================================================")
+	say(player, "[BlessingCost] Printed Dice Tiers 1-12 blessing cost table to Output console.")
+end
+
+local function onSetBlessingCommand(originTextSource: TextSource, unfilteredText: string)
+	local player = Players:GetPlayerByUserId(originTextSource.UserId)
+	if player == nil or not RunService:IsStudio() then
+		return
+	end
+
+	local idxStr, nameArg = unfilteredText:match("^%S+%s+(%S+)%s+(.+)$")
+	local idx = tonumber(idxStr)
+	if not idx or not nameArg then
+		say(player, "Usage: /setblessing <inventoryIndex> <name|none> (e.g. /setblessing 1 Fortune III)")
+		return
+	end
+
+	local owned = DataService.Get(player, "OwnedSwords")
+	if type(owned) ~= "table" or not owned[idx] then
+		say(player, ("Inventory sword #%d not found!"):format(idx))
+		return
+	end
+
+	local blessingName: string? = nil
+	local lower = nameArg:lower():gsub("^%s*(.-)%s*$", "%1")
+	if lower == "none" or lower == "clear" or lower == "nil" or lower == "" then
+		blessingName = nil
+	else
+		local foundDef = nil
+		for _, def in ipairs(Blessings.List) do
+			if def.name:lower() == lower then
+				foundDef = def
+				break
+			end
+		end
+		if not foundDef then
+			say(player, ("Unknown blessing '%s'. Available: Fortune I/II/III, Greed I/II/III, Appraiser's Eye, Enchanter's Soul, Swiftfoot, or none"):format(nameArg))
+			return
+		end
+		blessingName = foundDef.name
+	end
+
+	local updated = table.clone(owned)
+	local entryClone = table.clone(updated[idx])
+	entryClone.blessing = blessingName
+	updated[idx] = entryClone
+
+	local ok = DataService.Set(player, "OwnedSwords", updated)
+	if ok then
+		say(player, ("Set inventory sword #%d ('%s') blessing to '%s'"):format(
+			idx,
+			entryClone.id,
+			blessingName or "none"
+		))
+	else
+		say(player, "/setblessing failed to save.")
+	end
+end
+
+local function onBlessingTestCommand(originTextSource: TextSource, unfilteredText: string)
+	local player = Players:GetPlayerByUserId(originTextSource.UserId)
+	if player == nil or not RunService:IsStudio() then
+		return
+	end
+
+	local arg = unfilteredText:match("^%S+%s+(%S+)")
+	local count = tonumber(arg) or 1000
+	count = math.clamp(math.floor(count), 1, 100000)
+
+	local counts: { [string]: number } = {}
+	for _, def in ipairs(Blessings.List) do
+		counts[def.name] = 0
+	end
+
+	for _ = 1, count do
+		local rolled = Blessings.RollRandomBlessing()
+		counts[rolled.name] = (counts[rolled.name] or 0) + 1
+	end
+
+	print(("[DevCommands] ====== Blessing Distribution Test (%d Rolls, Studio Only, 0 Gold) ======"):format(count))
+	say(player, ("[BlessingTest] Simulating %d rolls against Config/Blessings (0 Gold)... (check Output)"):format(count))
+	for _, def in ipairs(Blessings.List) do
+		local c = counts[def.name] or 0
+		local actual = (c / count) * 100
+		print(string.format("  %-18s : %6d rolls (%5.2f%%) | Expected: %5.2f%%", def.name, c, actual, def.rollChance))
+	end
+	print("================================================================================")
+end
+
 function DevCommands.Start()
 	if not RunService:IsStudio() then
 		return
@@ -705,6 +822,24 @@ function DevCommands.Start()
 	pedSlotsCommand.PrimaryAlias = "/pedslots"
 	pedSlotsCommand.Triggered:Connect(onPedSlotsCommand)
 	pedSlotsCommand.Parent = TextChatService
+
+	local blessingCostCommand = Instance.new("TextChatCommand")
+	blessingCostCommand.Name = "DevBlessingCostCommand"
+	blessingCostCommand.PrimaryAlias = "/blessingcost"
+	blessingCostCommand.Triggered:Connect(onBlessingCostCommand)
+	blessingCostCommand.Parent = TextChatService
+
+	local setBlessingCommand = Instance.new("TextChatCommand")
+	setBlessingCommand.Name = "DevSetBlessingCommand"
+	setBlessingCommand.PrimaryAlias = "/setblessing"
+	setBlessingCommand.Triggered:Connect(onSetBlessingCommand)
+	setBlessingCommand.Parent = TextChatService
+
+	local blessingTestCommand = Instance.new("TextChatCommand")
+	blessingTestCommand.Name = "DevBlessingTestCommand"
+	blessingTestCommand.PrimaryAlias = "/blessingtest"
+	blessingTestCommand.Triggered:Connect(onBlessingTestCommand)
+	blessingTestCommand.Parent = TextChatService
 end
 
 return DevCommands

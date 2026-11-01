@@ -13,6 +13,7 @@ local Config = ReplicatedStorage:WaitForChild("Config")
 local Swords = require(Config:WaitForChild("Swords"))
 local Grades = require(Config:WaitForChild("Grades"))
 local Enchants = require(Config:WaitForChild("Enchants"))
+local Blessings = require(Config:WaitForChild("Blessings"))
 local GameConfig = require(Config:WaitForChild("Game"))
 local Assets = require(Config:WaitForChild("Assets"))
 
@@ -22,6 +23,7 @@ local Button = require(Components:WaitForChild("Button"))
 local Panel = require(Components:WaitForChild("Panel"))
 local GradeBadge = require(Components:WaitForChild("GradeBadge"))
 local EnchantBadge = require(Components:WaitForChild("EnchantBadge"))
+local BlessingBadge = require(Components:WaitForChild("BlessingBadge"))
 
 export type OwnedSwordEntry = {
 	uid: string,
@@ -224,7 +226,7 @@ function InventoryUI.new(parentGui: Instance): InventoryUIInstance
 
 	local inspName = Instance.new("TextLabel")
 	inspName.Name = "InspName"
-	inspName.Size = UDim2.new(1, -110, 0, 24)
+	inspName.Size = UDim2.new(1, -180, 0, 24)
 	inspName.Position = UDim2.new(0, 0, 0, 0)
 	inspName.BackgroundTransparency = 1
 	inspName.Font = Theme.Fonts.Title
@@ -246,6 +248,14 @@ function InventoryUI.new(parentGui: Instance): InventoryUIInstance
 		Enchant = nil,
 		Size = UDim2.new(0, 68, 0, 20),
 		Position = UDim2.new(1, -32, 0, 2),
+		AnchorPoint = Vector2.new(1, 0),
+		Parent = inspContent,
+	})
+
+	local inspBlessingBadge = BlessingBadge.new({
+		Blessing = nil,
+		Size = UDim2.new(0, 72, 0, 20),
+		Position = UDim2.new(1, -104, 0, 2),
 		AnchorPoint = Vector2.new(1, 0),
 		Parent = inspContent,
 	})
@@ -283,10 +293,22 @@ function InventoryUI.new(parentGui: Instance): InventoryUIInstance
 	inspSellValue.Text = ""
 	inspSellValue.Parent = inspContent
 
+	local inspBlessingDesc = Instance.new("TextLabel")
+	inspBlessingDesc.Name = "InspBlessingDesc"
+	inspBlessingDesc.Size = UDim2.new(1, 0, 0, 18)
+	inspBlessingDesc.Position = UDim2.new(0, 0, 0, 86)
+	inspBlessingDesc.BackgroundTransparency = 1
+	inspBlessingDesc.Font = Theme.Fonts.Body
+	inspBlessingDesc.TextSize = 11
+	inspBlessingDesc.TextColor3 = Theme.Colors.AuraCyan
+	inspBlessingDesc.Text = ""
+	inspBlessingDesc.Visible = false
+	inspBlessingDesc.Parent = inspContent
+
 	local inspStatus = Instance.new("TextLabel")
 	inspStatus.Name = "InspStatus"
 	inspStatus.Size = UDim2.new(1, 0, 0, 18)
-	inspStatus.Position = UDim2.new(0, 0, 0, 86)
+	inspStatus.Position = UDim2.new(0, 0, 0, 106)
 	inspStatus.BackgroundTransparency = 1
 	inspStatus.Font = Theme.Fonts.Button
 	inspStatus.TextSize = 11
@@ -720,7 +742,8 @@ function InventoryUI.new(parentGui: Instance): InventoryUIInstance
 			end
 
 			-- Enchant badge on top-right (below Grade badge if graded, else top-right)
-			if typeof(entry.enchant) == "string" and entry.enchant ~= "" then
+			local hasEnchant = typeof(entry.enchant) == "string" and entry.enchant ~= ""
+			if hasEnchant then
 				EnchantBadge.new({
 					Enchant = entry.enchant,
 					Size = UDim2.new(0, 48, 0, 15),
@@ -729,6 +752,25 @@ function InventoryUI.new(parentGui: Instance): InventoryUIInstance
 					Parent = card,
 					ZIndex = 6,
 					TextSize = 9,
+				})
+			end
+
+			-- Blessing badge on top-right (stacked below Enchant/Grade)
+			if typeof(entry.blessing) == "string" and entry.blessing ~= "" then
+				local yPos = 2
+				if hasGrade and hasEnchant then
+					yPos = 37
+				elseif hasGrade or hasEnchant then
+					yPos = 20
+				end
+				BlessingBadge.new({
+					Blessing = entry.blessing,
+					Size = UDim2.new(0, 48, 0, 15),
+					Position = UDim2.new(1, -2, 0, yPos),
+					AnchorPoint = Vector2.new(1, 0),
+					Parent = card,
+					ZIndex = 6,
+					TextSize = 8,
 				})
 			end
 
@@ -773,9 +815,12 @@ function InventoryUI.new(parentGui: Instance): InventoryUIInstance
 			inspRarity.Text = ""
 			inspDamage.Text = ""
 			inspSellValue.Text = ""
+			inspBlessingDesc.Text = ""
+			inspBlessingDesc.Visible = false
 			inspStatus.Text = ""
 			GradeBadge.Update(inspGradeBadge, nil)
 			EnchantBadge.Update(inspEnchantBadge, nil)
+			BlessingBadge.Update(inspBlessingBadge, nil)
 			equipButton:SetEnabled(false)
 			lockButton:SetEnabled(false)
 			sellButton:SetEnabled(false)
@@ -804,6 +849,16 @@ function InventoryUI.new(parentGui: Instance): InventoryUIInstance
 
 		GradeBadge.Update(inspGradeBadge, selectedEntry.grade)
 		EnchantBadge.Update(inspEnchantBadge, selectedEntry.enchant)
+		BlessingBadge.Update(inspBlessingBadge, selectedEntry.blessing)
+
+		if selectedEntry.blessing and selectedEntry.blessing ~= "" then
+			local bDef = Blessings.GetBlessingDef(selectedEntry.blessing)
+			inspBlessingDesc.Text = ("Blessing: %s"):format(bDef and bDef.effectText or selectedEntry.blessing)
+			inspBlessingDesc.Visible = true
+		else
+			inspBlessingDesc.Text = ""
+			inspBlessingDesc.Visible = false
+		end
 
 		local gradeMult = Grades.GetMultiplier(selectedEntry.grade)
 		local enchantMult = Enchants.GetMultiplier(selectedEntry.enchant)
@@ -924,7 +979,24 @@ function InventoryUI.new(parentGui: Instance): InventoryUIInstance
 		local swordDef = selectedEntry and swordDefMap[selectedEntry.id]
 		local name = swordDef and swordDef.name or "this sword"
 		local salePrice = SalePrice.calculate(selectedEntry)
-		sellConfirmText.Text = ("Are you sure you want to sell %s for +%s Gold?\n\n(This action cannot be undone.)"):format(name, NumberFormat.format(salePrice))
+
+		local warnings = {}
+		if selectedEntry.grade and selectedEntry.grade ~= "" then
+			table.insert(warnings, "Grade " .. selectedEntry.grade)
+		end
+		if selectedEntry.enchant and selectedEntry.enchant ~= "" then
+			table.insert(warnings, "Enchant " .. selectedEntry.enchant)
+		end
+		if selectedEntry.blessing and selectedEntry.blessing ~= "" then
+			table.insert(warnings, "Blessing " .. selectedEntry.blessing)
+		end
+
+		local warnText = ""
+		if #warnings > 0 then
+			warnText = ("\n\n⚠️ Warning: This sword has %s!"):format(table.concat(warnings, ", "))
+		end
+
+		sellConfirmText.Text = ("Are you sure you want to sell %s for +%s Gold?%s\n\n(This action cannot be undone.)"):format(name, NumberFormat.format(salePrice), warnText)
 		sellConfirmPopup:Open()
 	end)
 

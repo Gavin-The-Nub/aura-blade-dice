@@ -26,6 +26,9 @@ The following commands are implemented in `src/ServerScriptService/Services/DevC
 - [ ] **/setenchant `<inventoryIndex>` `<name>`**: Sets specific enchant on sword in inventory for testing multipliers and badges.
 - [ ] **/gradetest [n]**: Simulates n rolls against Config/Grades and prints distribution and percentage vs expected odds to Output.
 - [ ] **/enchanttest [n]**: Simulates n rolls against Config/Enchants and prints distribution and percentage vs expected odds to Output.
+- [ ] **/blessingcost**: Prints the Config/Dice prices and resulting blessing roll costs for Dice tiers 1 to 12 to the Output console.
+- [ ] **/setblessing `<inventoryIndex>` `<name>`**: Sets specific blessing on sword in inventory for testing badges and mechanics (or "none" to clear).
+- [ ] **/blessingtest `<n>`**: Simulates n rolls (capped at 100,000) against Config/Blessings with 0 Gold cost and prints distribution and percentage vs expected odds to Output.
 
 > **Production Safeguard:** Verify that `DevCommands.luau` and `ServerScriptService/EconSim.luau` include Studio-only gating or are removed before production builds.
 

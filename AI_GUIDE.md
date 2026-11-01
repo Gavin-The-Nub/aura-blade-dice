@@ -107,3 +107,5 @@ Costs reach Septillion scale. Use normal Luau numbers (doubles). Always display 
 - **Enchant Tokens In-Game Source:** `EnchantTokens` currency has no real gameplay source until Trials and Golden Rush central arena events are implemented; currently testing uses the Studio `/tokens` dev command.
 - **Enchant Non-Gold Passive Effects:** Non-Gold passive enchant effects defined in GDD section 5B (swing speed, crit chance, Fever charge rate, boss damage, luck buffs, and Transcendent every-3rd-tap bonus) are stored as metadata in `Config/Enchants.luau` and shown in the UI, but are NOT applied to gameplay mechanics yet (this build applies Gold multiplier ONLY).
 - **Economy Simulation - Sell Income:** Sword sale Gold income (single sell, Sell All, and Auto-Sell) is not yet modeled in `ServerScriptService/EconSim.luau`; `Game.Selling.BaseDamageMultiplier = 10` is a placeholder pending EconSim integration.
+- **Equip Best & Blessings:** Equip Best ignores blessings (11-2 will add a warning when it would unplace blessed swords).
+- **Auto-Tap Rate:** Auto-Tap rate (10/s) is not specified in the GDD.

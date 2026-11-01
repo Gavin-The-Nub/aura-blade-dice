@@ -96,6 +96,17 @@ local Stations: StationsConfig = {
 			HasModel = true,
 			Group = "Plaza",
 		},
+		Runesmith = {
+			Type = "Runesmith",
+			ActionText = "Bless",
+			ObjectText = "Runesmith",
+			-- South-West of SpawnLocation, clear of Sell (-20, 1.5, -10) and Appraiser (0, 1.5, 22)
+			Position = Vector3.new(-20, 1.5, 10),
+			Size = Vector3.new(8, 2, 8),
+			ColorToken = "AuraCyan",
+			HasModel = true,
+			Group = "Plaza",
+		},
 	},
 	TrialGroundsMarkers = {
 		-- Reserved marker for Trial-side group: will be moved here in later phase

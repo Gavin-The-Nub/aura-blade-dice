@@ -338,7 +338,7 @@ function InventoryService.GetSellAllPreview(player: Player): (boolean, any?, str
 					if entry.uid ~= equippedUid and not placedMap[entry.uid] and entry.locked ~= true then
 						table.insert(eligibleUids, entry.uid)
 						totalGold += InventoryService.CalculateSwordSalePrice(entry)
-						if (entry.grade and entry.grade ~= "") or (entry.enchant and entry.enchant ~= "") then
+						if (entry.grade and entry.grade ~= "") or (entry.enchant and entry.enchant ~= "") or (entry.blessing and entry.blessing ~= "") then
 							gradedOrEnchantedCount += 1
 						end
 					end
