@@ -201,14 +201,17 @@ local function onPlayerAdded(player: Player)
 		end
 	end
 
-	-- Migrate PedestalSlots: default to GameConfig.Plot.DefaultPedestalsPerPlot
+	-- Migrate PedestalSlots: default to GameConfig.Plot.DefaultPedestalsPerPlot, clamp to MaxPedestals
+	local maxPedestals = (GameConfig.Plot and GameConfig.Plot.MaxPedestals) or 11
 	if type(profile.Data.PedestalSlots) ~= "number" or profile.Data.PedestalSlots < 1 then
 		profile.Data.PedestalSlots = GameConfig.Plot.DefaultPedestalsPerPlot
+	elseif profile.Data.PedestalSlots > maxPedestals then
+		profile.Data.PedestalSlots = maxPedestals
 	end
 	local maxPedestalSlots = profile.Data.PedestalSlots
 
 	-- Migrate PlacedSwords:
-	-- Drop invalid slot keys (not "1".."10"), slots > PedestalSlots, unowned swords,
+	-- Drop invalid slot keys (not "1".."11"), slots > PedestalSlots, unowned swords,
 	-- duplicate swords across multiple slots (keep lowest slot), and currently equipped sword
 	if type(profile.Data.PlacedSwords) ~= "table" then
 		profile.Data.PlacedSwords = {}
@@ -227,7 +230,7 @@ local function onPlayerAdded(player: Player)
 		local cleanedPlaced: { [string]: string } = {}
 		local seenUids: { [string]: number } = {} -- uid -> lowest slot number
 
-		for slotNum = 1, math.min(10, maxPedestalSlots) do
+		for slotNum = 1, math.min(maxPedestals, maxPedestalSlots) do
 			local slotKey = tostring(slotNum)
 			local uid = profile.Data.PlacedSwords[slotKey]
 			if type(uid) == "string" and uid ~= "" then
@@ -372,6 +375,12 @@ function DataService.Set(player: Player, key: string, value: any): boolean
 				return false
 			end
 		end
+		if key == "PedestalSlots" then
+			local maxPedestals = (GameConfig.Plot and GameConfig.Plot.MaxPedestals) or 11
+			if value < 1 or value > maxPedestals or value ~= math.floor(value) then
+				return false
+			end
+		end
 	end
 	profile.Data[key] = value
 	changedEvent:Fire(player, key, value)
@@ -418,6 +427,12 @@ function DataService.SetMany(player: Player, updates: { [string]: any }): boolea
 			end
 			if key == "DiceTier" then
 				if value < 1 or value > #Dice or value ~= math.floor(value) then
+					return false
+				end
+			end
+			if key == "PedestalSlots" then
+				local maxPedestals = (GameConfig.Plot and GameConfig.Plot.MaxPedestals) or 11
+				if value < 1 or value > maxPedestals or value ~= math.floor(value) then
 					return false
 				end
 			end

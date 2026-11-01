@@ -18,6 +18,7 @@ The following commands are implemented in `src/ServerScriptService/Services/DevC
 - [ ] **/unplace `<slot>`**: Removes sword from target pedestal slot.
 - [ ] **/fakeoffline [now] `<hours>`**: Stages or immediately simulates `<hours>` of offline income.
 - [ ] **/equipbest**: Automatically equips best damage sword and places top remaining swords onto pedestals.
+- [ ] **/pedslots `<n>`**: Sets active PedestalSlots (1 to 11) for testing pedestal unlocking and capacity (clears PlacedSwords above n when lowered).
 - [ ] **/econ [extended] [expected] [scope N] [goldMult] [luckMult] [critFeverFactor]**: Runs comprehensive economy and progression simulation across all 29 Dice tiers, or calculates expected Grade/Enchant multipliers.
 - [ ] **/gems `<amount>` / /gems +`<amount>`**: Sets or adds arbitrary Gems amounts for testing appraisals.
 - [ ] **/tokens `<amount>` / /tokens +`<amount>`**: Sets or adds arbitrary EnchantTokens amounts for testing enchants.

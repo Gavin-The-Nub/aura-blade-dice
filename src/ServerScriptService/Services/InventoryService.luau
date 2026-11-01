@@ -534,11 +534,12 @@ function InventoryService.EquipBest(player: Player): (boolean, string?)
 			end
 		end
 
+		local maxPedestals = (GameConfig.Plot and GameConfig.Plot.MaxPedestals) or 11
 		local pedestalSlots = DataService.Get(player, "PedestalSlots") or GameConfig.Plot.DefaultPedestalsPerPlot
 		if typeof(pedestalSlots) ~= "number" then
 			pedestalSlots = 4
 		end
-		pedestalSlots = math.clamp(math.floor(pedestalSlots), 1, 10)
+		pedestalSlots = math.clamp(math.floor(pedestalSlots), 1, maxPedestals)
 
 		-- Rank swords descending
 		local ranked = rankSwords(player, ownedSwords)
@@ -560,7 +561,7 @@ function InventoryService.EquipBest(player: Player): (boolean, string?)
 		-- Check if anything changes (skip writes if nothing changes)
 		local sameEquipped = (targetEquippedUid == oldEquipped)
 		local samePlaced = true
-		for slot = 1, 10 do
+		for slot = 1, maxPedestals do
 			local k = tostring(slot)
 			if (targetPlaced[k] or "") ~= (oldPlacedMap[k] or "") then
 				samePlaced = false

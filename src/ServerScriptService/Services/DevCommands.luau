@@ -21,6 +21,7 @@ local Grades = require(ReplicatedStorage.Config.Grades)
 local Enchants = require(ReplicatedStorage.Config.Enchants)
 local NumberFormat = require(ReplicatedStorage.Shared.NumberFormat)
 local Remotes = require(ReplicatedStorage.Shared.Remotes)
+local GameConfig = require(ReplicatedStorage.Config.Game)
 local EconSim = require(ServerScriptService.EconSim)
 
 local DevCommands = {}
@@ -427,6 +428,64 @@ local function onUnplaceCommand(originTextSource: TextSource, unfilteredText: st
 	end
 end
 
+function DevCommands.SetPedSlots(player: Player, slots: number): (boolean, string)
+	local maxPedestals = (GameConfig.Plot and GameConfig.Plot.MaxPedestals) or 11
+	if slots ~= math.floor(slots) or slots < 1 or slots > maxPedestals then
+		local msg = ("Usage: /pedslots <1-%d>"):format(maxPedestals)
+		say(player, msg)
+		return false, msg
+	end
+
+	local updates: { [string]: any } = {
+		PedestalSlots = slots,
+	}
+
+	-- When lowering, also clear PlacedSwords above slots so no sword stays stuck in a locked slot
+	local placed = DataService.Get(player, "PlacedSwords")
+	if type(placed) == "table" then
+		local cleaned = table.clone(placed)
+		local changed = false
+		for slotKey, _ in cleaned do
+			local sNum = tonumber(slotKey)
+			if sNum and sNum > slots then
+				cleaned[slotKey] = nil
+				changed = true
+			end
+		end
+		if changed then
+			updates["PlacedSwords"] = cleaned
+		end
+	end
+
+	local ok = DataService.SetMany(player, updates)
+	if ok then
+		local msg = ("PedestalSlots set to %d"):format(slots)
+		say(player, msg)
+		return true, msg
+	else
+		local msg = "/pedslots rejected (data not loaded or update failed)"
+		say(player, msg)
+		return false, msg
+	end
+end
+
+local function onPedSlotsCommand(originTextSource: TextSource, unfilteredText: string)
+	local player = Players:GetPlayerByUserId(originTextSource.UserId)
+	if player == nil then
+		return
+	end
+
+	local maxPedestals = (GameConfig.Plot and GameConfig.Plot.MaxPedestals) or 11
+	local arg = unfilteredText:match("^%S+%s+(%S+)")
+	local slots = tonumber(arg)
+	if arg == nil or slots == nil then
+		say(player, ("Usage: /pedslots <1-%d>"):format(maxPedestals))
+		return
+	end
+
+	DevCommands.SetPedSlots(player, slots)
+end
+
 local function onFakeOfflineCommand(originTextSource: TextSource, unfilteredText: string)
 	local player = Players:GetPlayerByUserId(originTextSource.UserId)
 	if player == nil then
@@ -640,6 +699,12 @@ function DevCommands.Start()
 	enchantTestCommand.PrimaryAlias = "/enchanttest"
 	enchantTestCommand.Triggered:Connect(onEnchantTestCommand)
 	enchantTestCommand.Parent = TextChatService
+
+	local pedSlotsCommand = Instance.new("TextChatCommand")
+	pedSlotsCommand.Name = "DevPedSlotsCommand"
+	pedSlotsCommand.PrimaryAlias = "/pedslots"
+	pedSlotsCommand.Triggered:Connect(onPedSlotsCommand)
+	pedSlotsCommand.Parent = TextChatService
 end
 
 return DevCommands

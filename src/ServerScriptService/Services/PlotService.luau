@@ -158,23 +158,24 @@ local function updateOwnerSign(plotId: number, player: Player?)
 	end
 end
 
--- Helper to create a placeholder target dummy at the front of a plot relative to its CFrame
-local function createPlaceholderDummy(plotInstance: Instance, plotId: number): Model?
-	local floor: BasePart? = nil
+-- Helper to get the base floor part of a plot
+local function getPlotFloor(plotInstance: Instance): BasePart?
 	if plotInstance:IsA("Model") then
 		if plotInstance.PrimaryPart and (plotInstance.PrimaryPart.Name == "PlotFloor" or plotInstance.PrimaryPart.Name == "Floor" or plotInstance.PrimaryPart.Name == "Platform") then
-			floor = plotInstance.PrimaryPart
+			return plotInstance.PrimaryPart
 		else
 			local namedFloor = plotInstance:FindFirstChild("PlotFloor") or plotInstance:FindFirstChild("Floor")
 			if namedFloor and namedFloor:IsA("BasePart") then
-				floor = namedFloor
-			elseif plotInstance.PrimaryPart then
-				floor = plotInstance.PrimaryPart
+				return namedFloor
 			end
 		end
-	elseif plotInstance:IsA("BasePart") and (plotInstance.Name == "PlotFloor" or plotInstance.Name == "Floor") then
-		floor = plotInstance
 	end
+	return nil
+end
+
+-- Helper to create a placeholder target dummy at the front of a plot relative to its CFrame
+local function createPlaceholderDummy(plotInstance: Instance, plotId: number): Model?
+	local floor: BasePart? = getPlotFloor(plotInstance)
 
 	if not floor then
 		warn(("[PlotService] Cannot create TargetDummy: no valid floor part (PrimaryPart or 'PlotFloor') found for Plot %d; skipping dummy generation."):format(plotId))
@@ -254,6 +255,109 @@ local function createPlaceholderDummy(plotInstance: Instance, plotId: number): M
 	return dummy
 end
 
+-- Helper to determine pedestal slot index by SlotIndex, Slot, or part name suffix
+local function getPedestalSlot(inst: Instance): number?
+	local slotIndex = inst:GetAttribute("SlotIndex")
+	if type(slotIndex) == "number" then
+		return slotIndex
+	end
+	local slot = inst:GetAttribute("Slot")
+	if type(slot) == "number" then
+		return slot
+	end
+	local numStr = inst.Name:match("%d+$")
+	if numStr then
+		return tonumber(numStr)
+	end
+	return nil
+end
+
+-- Ensures a plot has all pedestals up to MaxPedestals (idempotent: never duplicates or moves existing)
+local function ensurePlotPedestals(plotInstance: Instance, plotId: number, floor: BasePart)
+	local maxPedestals = GameConfig.Plot.MaxPedestals or 11
+	local defaultPedestals = GameConfig.Plot.DefaultPedestalsPerPlot or 4
+	local offsets = GameConfig.Plot.PedestalOffsets or {}
+
+	-- Discover existing pedestals in plotInstance
+	local existingBySlot: { [number]: { BasePart } } = {}
+	local totalFound = 0
+
+	for _, desc in plotInstance:GetDescendants() do
+		if CollectionService:HasTag(desc, PEDESTAL_TAG) or (desc:IsA("BasePart") and desc.Name:match("^Pedestal_%d+$")) then
+			if desc:IsA("BasePart") then
+				totalFound += 1
+				local slot = getPedestalSlot(desc)
+				if type(slot) == "number" then
+					if not existingBySlot[slot] then
+						existingBySlot[slot] = {}
+					end
+					table.insert(existingBySlot[slot], desc)
+					desc:SetAttribute("SlotIndex", slot)
+					desc:SetAttribute("Slot", slot)
+					desc:SetAttribute("PlotId", plotId)
+					if not CollectionService:HasTag(desc, PEDESTAL_TAG) then
+						CollectionService:AddTag(desc, PEDESTAL_TAG)
+					end
+				else
+					warn(("[PlotService] Plot_%d: Found pedestal part '%s' without a valid slot number!"):format(plotId, desc.Name))
+				end
+			end
+		end
+	end
+
+	-- Check for duplicate slot numbers
+	for slotNum, parts in existingBySlot do
+		if #parts > 1 then
+			warn(("[PlotService] Plot_%d has %d duplicate pedestals for slot %d!"):format(plotId, #parts, slotNum))
+		end
+	end
+
+	-- Check if plot has more than MaxPedestals
+	if totalFound > maxPedestals then
+		warn(("[PlotService] Plot_%d has more than %d pedestals (%d found)!"):format(plotId, maxPedestals, totalFound))
+	end
+
+	local existingCount = 0
+	for slot = 1, maxPedestals do
+		if existingBySlot[slot] and #existingBySlot[slot] > 0 then
+			existingCount += 1
+		end
+	end
+
+	local addedCount = 0
+	local plotFloorCFrame = floor.CFrame
+
+	for slot = 1, maxPedestals do
+		if not existingBySlot[slot] or #existingBySlot[slot] == 0 then
+			local offset = offsets[slot] or Vector3.new(0, 1.25, 0)
+			local pedPart = Instance.new("Part")
+			pedPart.Name = ("Pedestal_%d"):format(slot)
+			pedPart.Size = Vector3.new(4, 1.5, 4)
+			pedPart.CFrame = plotFloorCFrame * CFrame.new(offset)
+			pedPart.Anchored = true
+			if slot <= defaultPedestals then
+				pedPart.Material = Enum.Material.Neon
+				pedPart.Color = Theme.Colors.BorderSubtle
+			else
+				pedPart.Material = Enum.Material.Slate
+				pedPart.Color = Theme.Colors.BackgroundDark
+			end
+			pedPart.TopSurface = Enum.SurfaceType.Smooth
+			pedPart.BottomSurface = Enum.SurfaceType.Smooth
+			pedPart:SetAttribute("Slot", slot)
+			pedPart:SetAttribute("SlotIndex", slot)
+			pedPart:SetAttribute("PlotId", plotId)
+			CollectionService:AddTag(pedPart, PEDESTAL_TAG)
+			pedPart.Parent = plotInstance
+
+			addedCount += 1
+			existingBySlot[slot] = { pedPart }
+		end
+	end
+
+	print(("[PlotService] Plot_%d: %d existing, %d added"):format(plotId, existingCount, addedCount))
+end
+
 -- Generates default plot platforms in Workspace ONLY if no Plot-tagged objects exist
 local function generateDefaultPlots()
 	local folder = Instance.new("Folder")
@@ -297,32 +401,8 @@ local function generateDefaultPlots()
 		signPost.CanCollide = false
 		signPost.Parent = model
 
-		-- 4 Pedestal base parts (tagged "Pedestal")
-		local defaultPedestals = GameConfig.Plot.DefaultPedestalsPerPlot or 4
-		local pedestalOffsets = {
-			Vector3.new(-8, 1.25, -5),
-			Vector3.new(8, 1.25, -5),
-			Vector3.new(-8, 1.25, 5),
-			Vector3.new(8, 1.25, 5),
-		}
-
-		for slot = 1, defaultPedestals do
-			local offset = pedestalOffsets[slot] or Vector3.new(0, 1.25, 0)
-			local pedPart = Instance.new("Part")
-			pedPart.Name = ("Pedestal_%d"):format(slot)
-			pedPart.Size = Vector3.new(4, 1.5, 4)
-			pedPart.Position = floor.Position + offset
-			pedPart.Anchored = true
-			pedPart.Material = Enum.Material.Neon
-			pedPart.Color = Theme.Colors.BorderSubtle
-			pedPart.TopSurface = Enum.SurfaceType.Smooth
-			pedPart.BottomSurface = Enum.SurfaceType.Smooth
-			pedPart:SetAttribute("Slot", slot)
-			pedPart:SetAttribute("SlotIndex", slot)
-			pedPart:SetAttribute("PlotId", i)
-			CollectionService:AddTag(pedPart, PEDESTAL_TAG)
-			pedPart.Parent = model
-		end
+		-- Add all pedestals up to MaxPedestals using shared helper
+		ensurePlotPedestals(model, i, floor)
 
 		-- Target dummy placeholder at front of plot
 		createPlaceholderDummy(model, i)
@@ -352,16 +432,11 @@ local function discoverPlots()
 			inst:SetAttribute("PlotId", plotId)
 		end
 
-		for _, ped in inst:GetDescendants() do
-			if CollectionService:HasTag(ped, PEDESTAL_TAG) then
-				ped:SetAttribute("PlotId", plotId)
-				local slot = ped:GetAttribute("SlotIndex") or ped:GetAttribute("Slot")
-				if type(slot) ~= "number" then
-					local num = tonumber(ped.Name:match("%d+$"))
-					slot = num or 1
-				end
-				ped:SetAttribute("SlotIndex", slot)
-			end
+		local floor = getPlotFloor(inst)
+		if floor then
+			ensurePlotPedestals(inst, plotId, floor)
+		else
+			warn(("[PlotService] Cannot ensure pedestals for Plot_%d: no floor part found."):format(plotId))
 		end
 
 		-- Find or create TargetDummy for this plot
@@ -397,13 +472,23 @@ local function clearPlotPedestals(plotId: number)
 	if not plotModel then
 		return
 	end
+	local defaultPedestals = GameConfig.Plot.DefaultPedestalsPerPlot or 4
 	for _, ped in plotModel:GetDescendants() do
-		if CollectionService:HasTag(ped, PEDESTAL_TAG) then
+		if CollectionService:HasTag(ped, PEDESTAL_TAG) and ped:IsA("BasePart") then
 			ped:SetAttribute("PlacedSwordId", nil)
 			ped:SetAttribute("PlacedSwordName", nil)
 			ped:SetAttribute("PlacedSwordRarity", nil)
 			ped:SetAttribute("PlacedSwordGoldPerSec", nil)
 			ped:SetAttribute("PlacedSwordOwner", nil)
+
+			local slot = ped:GetAttribute("SlotIndex") or ped:GetAttribute("Slot") or 1
+			if slot <= defaultPedestals then
+				ped.Material = Enum.Material.Neon
+				ped.Color = Theme.Colors.BorderSubtle
+			else
+				ped.Material = Enum.Material.Slate
+				ped.Color = Theme.Colors.BackgroundDark
+			end
 		end
 	end
 end
@@ -437,7 +522,7 @@ local function refreshPedestals(player: Player)
 	local placedMap = if type(placed) == "table" then placed else {}
 
 	for _, ped in plotModel:GetDescendants() do
-		if CollectionService:HasTag(ped, PEDESTAL_TAG) then
+		if CollectionService:HasTag(ped, PEDESTAL_TAG) and ped:IsA("BasePart") then
 			local slot = ped:GetAttribute("SlotIndex") or ped:GetAttribute("Slot")
 			if type(slot) ~= "number" then
 				slot = tonumber(ped.Name:match("%d+$")) or 1
@@ -449,17 +534,29 @@ local function refreshPedestals(player: Player)
 			local swordEntry = if uid then ownedMap[uid] else nil
 			local swordDef = if swordEntry then swordDefMap[swordEntry.id] else nil
 
-			-- Pedestals above PedestalSlots get no sword attributes
-			if slot <= pedestalSlots and swordEntry and swordDef then
-				local gpt = TapService.CalculateSwordGoldPerTap(player, swordEntry)
-				local gps = gpt * passiveRate
+			-- Pedestals above PedestalSlots get no sword attributes and keep locked appearance
+			if slot <= pedestalSlots then
+				ped.Material = Enum.Material.Neon
+				ped.Color = Theme.Colors.BorderSubtle
+				if swordEntry and swordDef then
+					local gpt = TapService.CalculateSwordGoldPerTap(player, swordEntry)
+					local gps = gpt * passiveRate
 
-				ped:SetAttribute("PlacedSwordId", swordEntry.id)
-				ped:SetAttribute("PlacedSwordName", swordDef.name)
-				ped:SetAttribute("PlacedSwordRarity", swordDef.rarity)
-				ped:SetAttribute("PlacedSwordGoldPerSec", gps)
-				ped:SetAttribute("PlacedSwordOwner", player.DisplayName)
+					ped:SetAttribute("PlacedSwordId", swordEntry.id)
+					ped:SetAttribute("PlacedSwordName", swordDef.name)
+					ped:SetAttribute("PlacedSwordRarity", swordDef.rarity)
+					ped:SetAttribute("PlacedSwordGoldPerSec", gps)
+					ped:SetAttribute("PlacedSwordOwner", player.DisplayName)
+				else
+					ped:SetAttribute("PlacedSwordId", nil)
+					ped:SetAttribute("PlacedSwordName", nil)
+					ped:SetAttribute("PlacedSwordRarity", nil)
+					ped:SetAttribute("PlacedSwordGoldPerSec", nil)
+					ped:SetAttribute("PlacedSwordOwner", nil)
+				end
 			else
+				ped.Material = Enum.Material.Slate
+				ped.Color = Theme.Colors.BackgroundDark
 				ped:SetAttribute("PlacedSwordId", nil)
 				ped:SetAttribute("PlacedSwordName", nil)
 				ped:SetAttribute("PlacedSwordRarity", nil)
@@ -564,8 +661,9 @@ local function processOfflineIncome(player: Player)
 			end
 		end
 
+		local maxPedestals = GameConfig.Plot.MaxPedestals or 11
 		local passiveRate = GameConfig.Plot.PassiveRateMultiplier or 0.5
-		for slotNum = 1, math.min(10, pedestalSlots) do
+		for slotNum = 1, math.min(maxPedestals, pedestalSlots) do
 			local swordUid = placed[tostring(slotNum)]
 			if swordUid and ownedMap[swordUid] then
 				local swordEntry = ownedMap[swordUid]
@@ -621,8 +719,9 @@ function PlotService.PlaceSword(player: Player, slotIndex: unknown, swordUid: un
 			return false, "Data is loading..."
 		end
 
+		local maxPedestals = GameConfig.Plot.MaxPedestals or 11
 		local pedestalSlots = DataService.Get(player, "PedestalSlots") or GameConfig.Plot.DefaultPedestalsPerPlot
-		if slotIndex < 1 or slotIndex > pedestalSlots or slotIndex > 10 then
+		if slotIndex < 1 or slotIndex > pedestalSlots or slotIndex > maxPedestals then
 			return false, ("Slot %d is not unlocked (Unlocked: 1..%d)."):format(slotIndex, pedestalSlots)
 		end
 
@@ -700,8 +799,9 @@ function PlotService.RemoveSword(player: Player, slotIndex: unknown): (boolean, 
 			return false, "Data is loading..."
 		end
 
+		local maxPedestals = GameConfig.Plot.MaxPedestals or 11
 		local pedestalSlots = DataService.Get(player, "PedestalSlots") or GameConfig.Plot.DefaultPedestalsPerPlot
-		if slotIndex < 1 or slotIndex > pedestalSlots or slotIndex > 10 then
+		if slotIndex < 1 or slotIndex > pedestalSlots or slotIndex > maxPedestals then
 			return false, "Invalid slot."
 		end
 
@@ -757,8 +857,9 @@ function PlotService.SimulateOfflineIncome(player: Player, seconds: number): (nu
 			end
 		end
 
+		local maxPedestals = GameConfig.Plot.MaxPedestals or 11
 		local passiveRate = GameConfig.Plot.PassiveRateMultiplier or 0.5
-		for slotNum = 1, math.min(10, pedestalSlots) do
+		for slotNum = 1, math.min(maxPedestals, pedestalSlots) do
 			local swordUid = placed[tostring(slotNum)]
 			if swordUid and ownedMap[swordUid] then
 				local swordEntry = ownedMap[swordUid]
@@ -945,8 +1046,9 @@ function PlotService.Start()
 							end
 						end
 
+						local maxPedestals = GameConfig.Plot.MaxPedestals or 11
 						local totalPlayerPassiveGold = 0
-						for slotNum = 1, math.min(10, pedestalSlots) do
+						for slotNum = 1, math.min(maxPedestals, pedestalSlots) do
 							local swordUid = placed[tostring(slotNum)]
 							if swordUid and ownedMap[swordUid] then
 								local swordEntry = ownedMap[swordUid]

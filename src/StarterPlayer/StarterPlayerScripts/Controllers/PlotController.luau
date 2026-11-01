@@ -11,6 +11,7 @@ local TweenService = game:GetService("TweenService")
 local Remotes = require(ReplicatedStorage.Shared.Remotes)
 local Theme = require(ReplicatedStorage.Shared.Theme)
 local Swords = require(ReplicatedStorage.Config.Swords)
+local GameConfig = require(ReplicatedStorage.Config.Game)
 local NumberFormat = require(ReplicatedStorage.Shared.NumberFormat)
 local SwordSelectorPopup = require(ReplicatedStorage.Shared.UI.SwordSelectorPopup)
 local OfflineIncomePopup = require(ReplicatedStorage.Shared.UI.OfflineIncomePopup)
@@ -357,7 +358,7 @@ local function refreshPlotPrompts()
 					prompt.ObjectText = ("Pedestal #%d"):format(slot)
 					prompt.HoldDuration = 0
 					prompt.RequiresLineOfSight = false
-					prompt.MaxActivationDistance = 10
+					prompt.MaxActivationDistance = (GameConfig.Plot and GameConfig.Plot.PedestalPromptDistance) or 7
 					prompt.Parent = ped
 
 					local currentSlot = slot
