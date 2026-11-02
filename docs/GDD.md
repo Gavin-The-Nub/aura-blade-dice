@@ -163,7 +163,7 @@ Each Sword can hold one **Enchant** (rolled with **Enchant Reroll Tokens**). Enc
 #### 3. Runesmith (Hilt Blessings)
 Players can spend **Gold** at the Runesmith to roll a utility **Hilt Blessing** onto any Sword. Blessings remain active whether the Sword is held in your hand OR placed on a Plot Pedestal:
 * **Fortune I / II / III:** $+5\% / +12\% / +25\%$ Sword Roll Luck. Affects **Sword rolls** (Dice manual and Auto-Roll).
-* **Greed I / II / III:** $+10\% / +25\% / +50\%$ Global Gold Earned.
+* **Greed I / II / III:** $+10\% / +25\% / +50\%$ Gold earned from taps and pedestals (applies to active taps, Auto-Tap, passive pedestal income, and offline income; does NOT apply to sword sale price, Gems, Tokens, or Trial rewards).
 * **Appraiser's Eye:** $+20\%$ Luck when rolling for **Grades**. Affects **Grade rolls** at Master Appraiser.
 * **Enchanter's Soul:** $+20\%$ Luck when rolling for **Enchants**. Affects **Enchant rolls** at Enchanter.
 * **Swiftfoot:** $+15\%$ Player WalkSpeed and $+10\%$ Auto-Tap Speed.
@@ -172,6 +172,7 @@ Players can spend **Gold** at the Runesmith to roll a utility **Hilt Blessing** 
 * **Stacking Rule:** Active blessings sum within a family across the equipped sword plus placed pedestal swords up to the player's current `PedestalSlots`. Each unique sword `uid` is counted at most once (strict deduplication).
 * **Caps (placeholders):** Each blessing family bonus is clamped to a maximum cap (defined in `Config/Blessings.Caps`):
   * **Fortune Luck Cap:** $+100\%$ (`FortuneLuck = 1.0`, max $+100\%$ Sword Roll Luck)
+  * **Greed Gold Cap:** $+200\%$ (`GreedGold = 2.0`, max $+200\%$ Gold earned)
   * **Grade Luck Cap:** $+100\%$ (`GradeLuck = 1.0`, max $+100\%$ Grade Luck)
   * **Enchant Luck Cap:** $+100\%$ (`EnchantLuck = 1.0`, max $+100\%$ Enchant Luck)
 

@@ -13,6 +13,7 @@ local Grades = require(ReplicatedStorage.Config.Grades)
 local Enchants = require(ReplicatedStorage.Config.Enchants)
 local Remotes = require(ReplicatedStorage.Shared.Remotes)
 local DataService = require(ServerScriptService.Services.DataService)
+local BlessingService = require(ServerScriptService.BlessingService)
 
 type Bucket = {
 	tokens: number,
@@ -76,7 +77,17 @@ function TapService.CalculateSwordGoldPerTap(player: Player, swordEntry: any): n
 	return baseDamage * gradeMult * enchantMult * rebirthMult
 end
 
+-- Calculates expected Gold per tap with Greed blessing multiplier applied.
+-- Used exclusively for active tap income, passive pedestal ticks, and offline income.
+function TapService.CalculateSwordGoldIncome(player: Player, swordEntry: any): number
+	local baseGPT = TapService.CalculateSwordGoldPerTap(player, swordEntry)
+	local greedBonus = if player then BlessingService.GetGreedBonus(player) else 0
+	return baseGPT * (1 + greedBonus)
+end
+
 local function updateEquippedDamageCache(player: Player)
+	BlessingService.InvalidateCache(player)
+
 	if not DataService.IsLoaded(player) then
 		playerEquippedDamage[player] = GameConfig.Tap.UnarmedDamage
 		playerEquippedGoldPerTap[player] = GameConfig.Tap.UnarmedDamage
@@ -87,7 +98,7 @@ local function updateEquippedDamageCache(player: Player)
 	local equippedUid = DataService.Get(player, "EquippedSword")
 	if type(equippedUid) ~= "string" or equippedUid == "" then
 		playerEquippedDamage[player] = GameConfig.Tap.UnarmedDamage
-		playerEquippedGoldPerTap[player] = GameConfig.Tap.UnarmedDamage
+		playerEquippedGoldPerTap[player] = TapService.CalculateSwordGoldIncome(player, nil)
 		playerEquippedEntry[player] = nil
 		return
 	end
@@ -108,13 +119,13 @@ local function updateEquippedDamageCache(player: Player)
 		local swordDef = swordMap[foundEntry.id]
 		if swordDef then
 			playerEquippedDamage[player] = swordDef.baseDamage
-			playerEquippedGoldPerTap[player] = TapService.CalculateSwordGoldPerTap(player, foundEntry)
+			playerEquippedGoldPerTap[player] = TapService.CalculateSwordGoldIncome(player, foundEntry)
 			return
 		end
 	end
 
 	playerEquippedDamage[player] = GameConfig.Tap.UnarmedDamage
-	playerEquippedGoldPerTap[player] = GameConfig.Tap.UnarmedDamage
+	playerEquippedGoldPerTap[player] = TapService.CalculateSwordGoldIncome(player, nil)
 end
 
 function TapService.GetEquippedDamage(player: Player): number
@@ -405,7 +416,7 @@ function TapService.Start()
 	end
 
 	DataService.Changed:Connect(function(player: Player, key: string, _value: any)
-		if key == "EquippedSword" or key == "OwnedSwords" then
+		if key == "EquippedSword" or key == "OwnedSwords" or key == "PlacedSwords" or key == "PedestalSlots" then
 			updateEquippedDamageCache(player)
 		end
 	end)

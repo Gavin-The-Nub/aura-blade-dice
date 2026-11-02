@@ -130,11 +130,12 @@ Blessings.List = list
 Blessings.MinCost = MinCost
 Blessings.CostFraction = CostFraction
 
--- Caps for aggregated blessing effects (placeholders: +100% cap each)
+-- Caps for aggregated blessing effects (placeholders: +100% luck caps, +200% gold cap)
 Blessings.Caps = {
 	FortuneLuck = 1.0, -- +100% sword roll luck
 	GradeLuck = 1.0,   -- +100% grade roll luck
 	EnchantLuck = 1.0, -- +100% enchant roll luck
+	GreedGold = 2.0,   -- +200% gold multiplier placeholder cap
 }
 
 function Blessings.GetBlessingDef(name: string?): BlessingDef?

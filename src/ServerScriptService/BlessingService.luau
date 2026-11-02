@@ -5,7 +5,9 @@
 -- Rules:
 -- - Inspects only equipped uid plus placed uids up to player's current PedestalSlots (at most 12 swords)
 -- - Counts each sword uid at most once (strict deduplication)
--- - No caching: re-reads fresh from DataService on every call
+-- - Per-player cache: invalidates on equip, place, unplace, blessing roll, sell, pedestal slots change, and profile load
+-- - Never caches when player data is not loaded; never caches ZERO_BONUSES
+-- - Freezes cached table and its sources list for immutability
 -- - Returns zero bonuses without erroring if player data is not loaded
 -- - Clamps summed family bonuses against Config/Blessings.Caps
 
@@ -27,6 +29,8 @@ export type BlessingSource = {
 export type BlessingBonuses = {
 	fortuneRaw: number,
 	fortuneCapped: number,
+	greedRaw: number,
+	greedCapped: number,
 	gradeRaw: number,
 	gradeCapped: number,
 	enchantRaw: number,
@@ -37,6 +41,8 @@ export type BlessingBonuses = {
 local ZERO_BONUSES: BlessingBonuses = table.freeze({
 	fortuneRaw = 0,
 	fortuneCapped = 0,
+	greedRaw = 0,
+	greedCapped = 0,
 	gradeRaw = 0,
 	gradeCapped = 0,
 	enchantRaw = 0,
@@ -44,9 +50,18 @@ local ZERO_BONUSES: BlessingBonuses = table.freeze({
 	sources = table.freeze({}),
 })
 
+local cachedBonuses: { [Player]: BlessingBonuses } = {}
+
 local BlessingService = {}
 
--- Returns the full breakdown of aggregated raw and capped luck bonuses and contributing sources
+-- Invalidates the cached blessing bonuses for a player
+function BlessingService.InvalidateCache(player: Player)
+	if player ~= nil then
+		cachedBonuses[player] = nil
+	end
+end
+
+-- Returns the full breakdown of aggregated raw and capped luck/gold bonuses and contributing sources
 function BlessingService.GetBonuses(player: Player, dataServiceOverride: any?): BlessingBonuses
 	if player == nil then
 		return ZERO_BONUSES
@@ -55,8 +70,17 @@ function BlessingService.GetBonuses(player: Player, dataServiceOverride: any?): 
 		return ZERO_BONUSES
 	end
 
+	-- Fast-path cached lookup when not in test-override mode
+	if dataServiceOverride == nil then
+		local cached = cachedBonuses[player]
+		if cached ~= nil then
+			return cached
+		end
+	end
+
 	local ds = dataServiceOverride or DataService
 
+	-- NEVER cache when data is not loaded, and NEVER cache ZERO_BONUSES
 	if not ds.IsLoaded(player) then
 		return ZERO_BONUSES
 	end
@@ -90,6 +114,7 @@ function BlessingService.GetBonuses(player: Player, dataServiceOverride: any?): 
 	local seenUids: { [string]: boolean } = {}
 	local sources: { BlessingSource } = {}
 	local rawFortune = 0
+	local rawGreed = 0
 	local rawGrade = 0
 	local rawEnchant = 0
 
@@ -121,6 +146,8 @@ function BlessingService.GetBonuses(player: Player, dataServiceOverride: any?): 
 
 		if def.family == "Fortune" then
 			rawFortune += def.effectValues.rollLuck or 0
+		elseif def.family == "Greed" then
+			rawGreed += def.effectValues.goldMultiplier or 0
 		elseif def.family == "Appraiser" then
 			rawGrade += def.effectValues.gradeLuck or 0
 		elseif def.family == "Enchanter" then
@@ -137,25 +164,44 @@ function BlessingService.GetBonuses(player: Player, dataServiceOverride: any?): 
 		processCandidate(placedUid, ("Pedestal Slot #%d"):format(slotNum))
 	end
 
-	local caps = Blessings.Caps or { FortuneLuck = 1.0, GradeLuck = 1.0, EnchantLuck = 1.0 }
+	local caps = Blessings.Caps or { FortuneLuck = 1.0, GradeLuck = 1.0, EnchantLuck = 1.0, GreedGold = 2.0 }
 	local fortuneCap = caps.FortuneLuck or 1.0
+	local greedCap = caps.GreedGold or 2.0
 	local gradeCap = caps.GradeLuck or 1.0
 	local enchantCap = caps.EnchantLuck or 1.0
 
-	return {
+	local result: BlessingBonuses = table.freeze({
 		fortuneRaw = rawFortune,
 		fortuneCapped = math.min(rawFortune, fortuneCap),
+		greedRaw = rawGreed,
+		greedCapped = math.min(rawGreed, greedCap),
 		gradeRaw = rawGrade,
 		gradeCapped = math.min(rawGrade, gradeCap),
 		enchantRaw = rawEnchant,
 		enchantCapped = math.min(rawEnchant, enchantCap),
-		sources = sources,
-	}
+		sources = table.freeze(sources),
+	})
+
+	if dataServiceOverride == nil then
+		cachedBonuses[player] = result
+	end
+
+	return result
 end
 
 -- Returns capped Fortune bonus as a fraction (e.g. 0.25 for +25%, 0 if none)
 function BlessingService.GetFortuneLuckBonus(player: Player): number
 	return BlessingService.GetBonuses(player).fortuneCapped
+end
+
+-- Returns capped Greed bonus as a fraction (e.g. 0.50 for +50%, 0 if none)
+function BlessingService.GetGreedBonus(player: Player): number
+	return BlessingService.GetBonuses(player).greedCapped
+end
+
+-- Returns total Greed Gold multiplier: 1.0 + greedBonus (e.g. 1.50 for +50%)
+function BlessingService.GetGreedMultiplier(player: Player): number
+	return 1.0 + BlessingService.GetGreedBonus(player)
 end
 
 -- Returns capped Grade bonus as a fraction (e.g. 0.20 for +20%, 0 if none)
@@ -177,5 +223,33 @@ end
 function BlessingService.GetEnchantLuck(player: Player): number
 	return 1.0 + BlessingService.GetEnchantLuckBonus(player)
 end
+
+-- Lifecycle invalidation connections established immediately upon require:
+DataService.Changed:Connect(function(player: Player, key: string, _value: any)
+	if key == "EquippedSword" or key == "PlacedSwords" or key == "PedestalSlots" or key == "OwnedSwords" then
+		BlessingService.InvalidateCache(player)
+	end
+end)
+
+Players.PlayerAdded:Connect(function(player: Player)
+	BlessingService.InvalidateCache(player)
+	task.spawn(function()
+		if DataService.WaitForProfile(player) then
+			BlessingService.InvalidateCache(player)
+		end
+	end)
+end)
+
+for _, player in Players:GetPlayers() do
+	task.spawn(function()
+		if DataService.WaitForProfile(player) then
+			BlessingService.InvalidateCache(player)
+		end
+	end)
+end
+
+Players.PlayerRemoving:Connect(function(player: Player)
+	cachedBonuses[player] = nil
+end)
 
 return BlessingService

@@ -68,10 +68,10 @@ If you want to change this structure, ask me first.
   - **Sword Roll Luck:** `Total Sword Luck = Dice Base Luck × Rebirth Luck × Enchant passive Luck (data only, not applied yet) × Fever (1.5×) × (1 + Fortune Blessing Bonus) × Potion/Server boosts`
   - **Grade Roll Luck:** `Total Grade Luck = 1.0 + Appraiser's Eye Blessing Bonus` (rolled at Master Appraiser)
   - **Enchant Roll Luck:** `Total Enchant Luck = 1.0 + Enchanter's Soul Blessing Bonus` (rolled at Enchanter)
-  - **Blessings.Caps:** Defined in `Config/Blessings.Caps` (placeholders: `FortuneLuck = 1.0` (+100%), `GradeLuck = 1.0` (+100%), `EnchantLuck = 1.0` (+100%)). Active blessings sum within a family across the equipped sword plus placed pedestal swords up to player's `PedestalSlots` (each unique sword uid counted once), then clamp to the cap.
+  - **Blessings.Caps:** Defined in `Config/Blessings.Caps` (placeholders: `FortuneLuck = 1.0` (+100%), `GradeLuck = 1.0` (+100%), `EnchantLuck = 1.0` (+100%), `GreedGold = 2.0` (+200%)). Active blessings sum within a family across the equipped sword plus placed pedestal swords up to player's `PedestalSlots` (each unique sword uid counted once), then clamp to the cap.
 - **Roll odds & Cooldown:** `Effective Odds = max(1, Sword Base Odds / Total Luck)`. Roll cooldown is **global** (`Config/Game.Roll.Cooldown`, baseline 3.0s placeholder), not per Dice.
 - **Dice Ladder:** 29-tier progression table (Basic Dice up to Zenith Dice). Players can purchase any tier with Gold in any order and switch/equip any owned Dice tier at will.
-- **Gold per tap:** `Base Damage × Grade × Enchant × Rebirth × Crit`
+- **Gold per tap:** `Base Damage × Grade × Enchant × Rebirth × Crit × (1 + Greed)` (Greed multiplies Gold from taps, Auto-Tap, passive pedestal income, and offline income; it excludes sword sale price, Gems, Tokens, and Trial rewards).
 - **Crit:** 10% base chance, 2.5× Gold.
 - **Fever:** each tap adds 1 point to a 100-point meter. At 100 it triggers a 15-second mode with 2× swing speed, 100% crit, and +50% Luck.
 - **Pedestal passive income:** each pedestal Sword gives 50% of its Gold-per-tap value every second, including offline time (capped at 8 hours). Hard cap of **11 pedestals** per plot (4 starting, +1 each at Rebirths 3, 5, 7, 9, and 10, and +2 from VIP Forge). Each plot physically has 11 pedestal models, locked until earned.

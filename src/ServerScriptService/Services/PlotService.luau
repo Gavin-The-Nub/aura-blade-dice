@@ -15,6 +15,7 @@ local Remotes = require(ReplicatedStorage.Shared.Remotes)
 local Theme = require(ReplicatedStorage.Shared.Theme)
 local DataService = require(ServerScriptService.Services.DataService)
 local TapService = require(ServerScriptService.Services.TapService)
+local BlessingService = require(ServerScriptService.BlessingService)
 local PlayerActionLock = require(ServerScriptService.PlayerActionLock)
 
 local PLOT_TAG = "Plot"
@@ -495,6 +496,8 @@ end
 
 -- Syncs pedestal attributes on a player's plot from profile.Data.PlacedSwords
 local function refreshPedestals(player: Player)
+	BlessingService.InvalidateCache(player)
+
 	local plotId = playerToPlot[player]
 	if not plotId then
 		return
@@ -539,7 +542,7 @@ local function refreshPedestals(player: Player)
 				ped.Material = Enum.Material.Neon
 				ped.Color = Theme.Colors.BorderSubtle
 				if swordEntry and swordDef then
-					local gpt = TapService.CalculateSwordGoldPerTap(player, swordEntry)
+					local gpt = TapService.CalculateSwordGoldIncome(player, swordEntry)
 					local gps = gpt * passiveRate
 
 					ped:SetAttribute("PlacedSwordId", swordEntry.id)
@@ -667,7 +670,7 @@ local function processOfflineIncome(player: Player)
 			local swordUid = placed[tostring(slotNum)]
 			if swordUid and ownedMap[swordUid] then
 				local swordEntry = ownedMap[swordUid]
-				local gpt = TapService.CalculateSwordGoldPerTap(player, swordEntry)
+				local gpt = TapService.CalculateSwordGoldIncome(player, swordEntry)
 				passivePerSec += (gpt * passiveRate)
 			end
 		end
@@ -863,7 +866,7 @@ function PlotService.SimulateOfflineIncome(player: Player, seconds: number): (nu
 			local swordUid = placed[tostring(slotNum)]
 			if swordUid and ownedMap[swordUid] then
 				local swordEntry = ownedMap[swordUid]
-				local gpt = TapService.CalculateSwordGoldPerTap(player, swordEntry)
+				local gpt = TapService.CalculateSwordGoldIncome(player, swordEntry)
 				passivePerSec += (gpt * passiveRate)
 			end
 		end
@@ -1004,9 +1007,9 @@ function PlotService.Start()
 		end)
 	end
 
-	-- Listen for PlacedSwords, PedestalSlots, or OwnedSwords updates to refresh pedestal attributes
+	-- Listen for PlacedSwords, PedestalSlots, OwnedSwords, or EquippedSword updates to refresh pedestal attributes
 	DataService.Changed:Connect(function(player: Player, key: string, _value: any)
-		if key == "PlacedSwords" or key == "PedestalSlots" or key == "OwnedSwords" then
+		if key == "PlacedSwords" or key == "PedestalSlots" or key == "OwnedSwords" or key == "EquippedSword" then
 			refreshPedestals(player)
 		end
 	end)
@@ -1052,7 +1055,7 @@ function PlotService.Start()
 							local swordUid = placed[tostring(slotNum)]
 							if swordUid and ownedMap[swordUid] then
 								local swordEntry = ownedMap[swordUid]
-								local gpt = TapService.CalculateSwordGoldPerTap(player, swordEntry)
+								local gpt = TapService.CalculateSwordGoldIncome(player, swordEntry)
 								totalPlayerPassiveGold += (gpt * passiveRate)
 							end
 						end

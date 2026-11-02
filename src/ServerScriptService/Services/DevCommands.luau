@@ -722,10 +722,55 @@ local function onLuckCommand(originTextSource: TextSource, _unfilteredText: stri
 	local totalSwordLuck = RollService.GetTotalLuck(player)
 	local totalGradeLuck = BlessingService.GetGradeLuck(player)
 	local totalEnchantLuck = BlessingService.GetEnchantLuck(player)
+	local greedMultiplier = BlessingService.GetGreedMultiplier(player)
 
 	local fortuneCap = (Blessings.Caps and Blessings.Caps.FortuneLuck) or 1.0
+	local greedCap = (Blessings.Caps and Blessings.Caps.GreedGold) or 2.0
 	local gradeCap = (Blessings.Caps and Blessings.Caps.GradeLuck) or 1.0
 	local enchantCap = (Blessings.Caps and Blessings.Caps.EnchantLuck) or 1.0
+
+	-- Equipped sword stats breakdown
+	local equippedEntry = TapService.GetEquippedEntry(player)
+	local equippedId = "Unarmed"
+	local baseDamage = GameConfig.Tap.UnarmedDamage
+	local gradeMult = 1.0
+	local enchantMult = 1.0
+	if equippedEntry and typeof(equippedEntry) == "table" then
+		equippedId = equippedEntry.id or "sword"
+		baseDamage = TapService.GetEquippedDamage(player)
+		if typeof(equippedEntry.grade) == "string" then
+			gradeMult = Grades.GetMultiplier(equippedEntry.grade)
+		end
+		if typeof(equippedEntry.enchant) == "string" then
+			enchantMult = Enchants.GetMultiplier(equippedEntry.enchant)
+		end
+	end
+	local goldPerTapNoCrit = TapService.CalculateSwordGoldIncome(player, equippedEntry)
+
+	-- Total passive Gold per second
+	local placed = DataService.Get(player, "PlacedSwords")
+	local owned = DataService.Get(player, "OwnedSwords")
+	local rawSlots = DataService.Get(player, "PedestalSlots")
+	local defaultSlots = (GameConfig.Plot and GameConfig.Plot.DefaultPedestalsPerPlot) or 4
+	local maxSlots = (GameConfig.Plot and GameConfig.Plot.MaxPedestals) or 11
+	local pedestalSlots = math.clamp(if typeof(rawSlots) == "number" then rawSlots else defaultSlots, 1, maxSlots)
+	local passiveRate = (GameConfig.Plot and GameConfig.Plot.PassiveRateMultiplier) or 0.5
+	local totalPassiveGps = 0
+	if typeof(placed) == "table" and typeof(owned) == "table" then
+		local ownedMap: { [string]: any } = {}
+		for _, entry in owned do
+			if typeof(entry) == "table" and typeof(entry.uid) == "string" then
+				ownedMap[entry.uid] = entry
+			end
+		end
+		for s = 1, pedestalSlots do
+			local pUid = placed[tostring(s)]
+			if pUid and ownedMap[pUid] then
+				local gpt = TapService.CalculateSwordGoldIncome(player, ownedMap[pUid])
+				totalPassiveGps += (gpt * passiveRate)
+			end
+		end
+	end
 
 	print("================================================================================")
 	print(("[DevCommands] Luck & Blessing Report for %s"):format(player.Name))
@@ -735,6 +780,12 @@ local function onLuckCommand(originTextSource: TextSource, _unfilteredText: stri
 		bonuses.fortuneCapped * 100,
 		fortuneCap * 100,
 		totalSwordLuck
+	))
+	print(("[Greed Blessing]   Raw: +%.1f%% | Capped: +%.1f%% (Cap: +%.1f%%) | Total Gold Multiplier: %.2fx"):format(
+		bonuses.greedRaw * 100,
+		bonuses.greedCapped * 100,
+		greedCap * 100,
+		greedMultiplier
 	))
 	print(("[Grade Blessing]   Raw: +%.1f%% | Capped: +%.1f%% (Cap: +%.1f%%) | Total Grade Luck: %.2fx"):format(
 		bonuses.gradeRaw * 100,
@@ -747,6 +798,20 @@ local function onLuckCommand(originTextSource: TextSource, _unfilteredText: stri
 		bonuses.enchantCapped * 100,
 		enchantCap * 100,
 		totalEnchantLuck
+	))
+	print("--------------------------------------------------------------------------------")
+	print(("[Equipped Sword] %s | Base Damage: %.1f | Grade: %.2fx | Enchant: %.2fx | Greed: %.2fx | Gold per tap (no crit): %.2f"):format(
+		equippedId,
+		baseDamage,
+		gradeMult,
+		enchantMult,
+		greedMultiplier,
+		goldPerTapNoCrit
+	))
+	print(("[Passive Gold]   Total Passive Gold / Sec: %.2f Gold/s (active pedestals: %d, rate: %.0f%%)"):format(
+		totalPassiveGps,
+		pedestalSlots,
+		passiveRate * 100
 	))
 	print("--------------------------------------------------------------------------------")
 	print("Contributing Blessing Sources:")
@@ -809,12 +874,15 @@ local function onLuckCommand(originTextSource: TextSource, _unfilteredText: stri
 	end
 	print("================================================================================")
 
-	say(player, ("[Luck] Fortune: +%.1f%% (Raw: +%.1f%%) | Grade: +%.1f%% | Enchant: +%.1f%% | %d source(s). Detailed report printed to Output!"):format(
+	say(player, ("[Luck] Fortune: +%.1f%% | Greed: +%.1f%% (Raw: +%.1f%%, x%.2f) | Grade: +%.1f%% | Enchant: +%.1f%% | GPT: %.2f | Passive: %.2f/s"):format(
 		bonuses.fortuneCapped * 100,
-		bonuses.fortuneRaw * 100,
+		bonuses.greedCapped * 100,
+		bonuses.greedRaw * 100,
+		greedMultiplier,
 		bonuses.gradeCapped * 100,
 		bonuses.enchantCapped * 100,
-		#bonuses.sources
+		goldPerTapNoCrit,
+		totalPassiveGps
 	))
 end
 
