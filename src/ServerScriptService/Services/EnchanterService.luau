@@ -12,6 +12,7 @@ local GameConfig = require(ReplicatedStorage.Config.Game)
 local Enchants = require(ReplicatedStorage.Config.Enchants)
 local Remotes = require(ReplicatedStorage.Shared.Remotes)
 local AutoRollRunner = require(ServerScriptService.AutoRollRunner)
+local BlessingService = require(ServerScriptService.BlessingService)
 
 local runner = AutoRollRunner.new({
 	CurrencyKey = "EnchantTokens",
@@ -19,6 +20,7 @@ local runner = AutoRollRunner.new({
 	SwordField = "enchant",
 	ProgressEventName = "AutoEnchantProgress",
 	RollFn = Enchants.RollRandomEnchant,
+	GetLuckFn = BlessingService.GetEnchantLuck,
 	GetRankFn = Enchants.GetRank,
 	GetLoopInterval = function(): number
 		local enchanterCfg = GameConfig.Enchanter

@@ -16,10 +16,12 @@ local TapService = require(ServerScriptService.Services.TapService)
 local RollService = require(ServerScriptService.Services.RollService)
 local PlotService = require(ServerScriptService.Services.PlotService)
 local InventoryService = require(ServerScriptService.Services.InventoryService)
+local Swords = require(ReplicatedStorage.Config.Swords)
 local Dice = require(ReplicatedStorage.Config.Dice)
 local Grades = require(ReplicatedStorage.Config.Grades)
 local Enchants = require(ReplicatedStorage.Config.Enchants)
 local Blessings = require(ReplicatedStorage.Config.Blessings)
+local BlessingService = require(ServerScriptService.BlessingService)
 local NumberFormat = require(ReplicatedStorage.Shared.NumberFormat)
 local Remotes = require(ReplicatedStorage.Shared.Remotes)
 local GameConfig = require(ReplicatedStorage.Config.Game)
@@ -710,6 +712,112 @@ local function onBlessingTestCommand(originTextSource: TextSource, unfilteredTex
 	print("================================================================================")
 end
 
+local function onLuckCommand(originTextSource: TextSource, _unfilteredText: string)
+	local player = Players:GetPlayerByUserId(originTextSource.UserId)
+	if player == nil or not RunService:IsStudio() then
+		return
+	end
+
+	local bonuses = BlessingService.GetBonuses(player)
+	local totalSwordLuck = RollService.GetTotalLuck(player)
+	local totalGradeLuck = BlessingService.GetGradeLuck(player)
+	local totalEnchantLuck = BlessingService.GetEnchantLuck(player)
+
+	local fortuneCap = (Blessings.Caps and Blessings.Caps.FortuneLuck) or 1.0
+	local gradeCap = (Blessings.Caps and Blessings.Caps.GradeLuck) or 1.0
+	local enchantCap = (Blessings.Caps and Blessings.Caps.EnchantLuck) or 1.0
+
+	print("================================================================================")
+	print(("[DevCommands] Luck & Blessing Report for %s"):format(player.Name))
+	print("--------------------------------------------------------------------------------")
+	print(("[Fortune Blessing] Raw: +%.1f%% | Capped: +%.1f%% (Cap: +%.1f%%) | Total Sword Luck: %.2fx"):format(
+		bonuses.fortuneRaw * 100,
+		bonuses.fortuneCapped * 100,
+		fortuneCap * 100,
+		totalSwordLuck
+	))
+	print(("[Grade Blessing]   Raw: +%.1f%% | Capped: +%.1f%% (Cap: +%.1f%%) | Total Grade Luck: %.2fx"):format(
+		bonuses.gradeRaw * 100,
+		bonuses.gradeCapped * 100,
+		gradeCap * 100,
+		totalGradeLuck
+	))
+	print(("[Enchant Blessing] Raw: +%.1f%% | Capped: +%.1f%% (Cap: +%.1f%%) | Total Enchant Luck: %.2fx"):format(
+		bonuses.enchantRaw * 100,
+		bonuses.enchantCapped * 100,
+		enchantCap * 100,
+		totalEnchantLuck
+	))
+	print("--------------------------------------------------------------------------------")
+	print("Contributing Blessing Sources:")
+	if #bonuses.sources == 0 then
+		print("  (None - no blessed swords equipped or placed)")
+	else
+		for _, src in ipairs(bonuses.sources) do
+			print(("  [%s] %s (%s): %s"):format(src.slot, src.swordId, src.uid, src.blessing))
+		end
+	end
+	print("--------------------------------------------------------------------------------")
+
+	-- Rarest 3 Swords (from Config, sorted descending by baseOdds)
+	local rollable: { Swords.SwordDef } = {}
+	for _, s in Swords do
+		if not s.isTest then
+			table.insert(rollable, s)
+		end
+	end
+	table.sort(rollable, function(a, b)
+		return a.baseOdds > b.baseOdds
+	end)
+	print(("Effective Odds - Rarest 3 Swords (Total Sword Luck: %.2fx):"):format(totalSwordLuck))
+	for i = 1, math.min(3, #rollable) do
+		local s = rollable[i]
+		local effOdds = math.max(1, s.baseOdds / totalSwordLuck)
+		print(("  #%d %-28s | Base: 1 in %-10s | Effective: 1 in %.2f"):format(
+			i, s.name, NumberFormat.format(s.baseOdds), effOdds
+		))
+	end
+
+	-- Rarest 3 Grades (from Config, sorted ascending by rollChance)
+	local rarestGrades: { Grades.GradeDef } = table.clone(Grades.GetAll())
+	table.sort(rarestGrades, function(a, b)
+		return a.rollChance < b.rollChance
+	end)
+	print(("Effective Odds - Rarest 3 Grades (Total Grade Luck: %.2fx):"):format(totalGradeLuck))
+	for i = 1, math.min(3, #rarestGrades) do
+		local g = rarestGrades[i]
+		local baseOdds = g.baseOdds or (100 / g.rollChance)
+		local effOdds = math.max(1, (baseOdds :: number) / totalGradeLuck)
+		print(("  #%d Grade %-6s (weight %5.2f%%) | Base Odds: 1 in %-8.2f | Effective: 1 in %.2f"):format(
+			i, g.name, g.rollChance, baseOdds, effOdds
+		))
+	end
+
+	-- Rarest 3 Enchants (from Config, sorted ascending by rollChance)
+	local rarestEnchants: { Enchants.EnchantDef } = table.clone(Enchants.GetAll())
+	table.sort(rarestEnchants, function(a, b)
+		return a.rollChance < b.rollChance
+	end)
+	print(("Effective Odds - Rarest 3 Enchants (Total Enchant Luck: %.2fx):"):format(totalEnchantLuck))
+	for i = 1, math.min(3, #rarestEnchants) do
+		local e = rarestEnchants[i]
+		local baseOdds = e.baseOdds or (100 / e.rollChance)
+		local effOdds = math.max(1, (baseOdds :: number) / totalEnchantLuck)
+		print(("  #%d Enchant %-14s (weight %5.2f%%) | Base Odds: 1 in %-8.2f | Effective: 1 in %.2f"):format(
+			i, e.name, e.rollChance, baseOdds, effOdds
+		))
+	end
+	print("================================================================================")
+
+	say(player, ("[Luck] Fortune: +%.1f%% (Raw: +%.1f%%) | Grade: +%.1f%% | Enchant: +%.1f%% | %d source(s). Detailed report printed to Output!"):format(
+		bonuses.fortuneCapped * 100,
+		bonuses.fortuneRaw * 100,
+		bonuses.gradeCapped * 100,
+		bonuses.enchantCapped * 100,
+		#bonuses.sources
+	))
+end
+
 function DevCommands.Start()
 	if not RunService:IsStudio() then
 		return
@@ -840,6 +948,12 @@ function DevCommands.Start()
 	blessingTestCommand.PrimaryAlias = "/blessingtest"
 	blessingTestCommand.Triggered:Connect(onBlessingTestCommand)
 	blessingTestCommand.Parent = TextChatService
+
+	local luckCommand = Instance.new("TextChatCommand")
+	luckCommand.Name = "DevLuckCommand"
+	luckCommand.PrimaryAlias = "/luck"
+	luckCommand.Triggered:Connect(onLuckCommand)
+	luckCommand.Parent = TextChatService
 end
 
 return DevCommands

@@ -29,6 +29,7 @@ The following commands are implemented in `src/ServerScriptService/Services/DevC
 - [ ] **/blessingcost**: Prints the Config/Dice prices and resulting blessing roll costs for Dice tiers 1 to 12 to the Output console.
 - [ ] **/setblessing `<inventoryIndex>` `<name>`**: Sets specific blessing on sword in inventory for testing badges and mechanics (or "none" to clear).
 - [ ] **/blessingtest `<n>`**: Simulates n rolls (capped at 100,000) against Config/Blessings with 0 Gold cost and prints distribution and percentage vs expected odds to Output.
+- [ ] **/luck**: Prints player's aggregated Fortune, Grade, and Enchant blessing bonuses (raw & capped), contributing sword sources, and effective odds for the rarest 3 swords, Grades, and Enchants.
 
 > **Production Safeguard:** Verify that `DevCommands.luau` and `ServerScriptService/EconSim.luau` include Studio-only gating or are removed before production builds.
 

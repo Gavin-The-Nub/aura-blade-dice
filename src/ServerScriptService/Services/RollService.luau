@@ -15,6 +15,7 @@ local Remotes = require(ReplicatedStorage.Shared.Remotes)
 local SalePrice = require(ReplicatedStorage.Shared.SalePrice)
 local DataService = require(ServerScriptService.Services.DataService)
 local TapService = require(ServerScriptService.Services.TapService)
+local BlessingService = require(ServerScriptService.BlessingService)
 
 local RollService = {}
 
@@ -64,12 +65,13 @@ local function getPlayerDice(player: Player): Dice.DiceDef
 	return diceMap[tier] or diceMap[1]
 end
 
--- Calculates Total Luck: Dice Base Luck × Fever (+50%) × Future Boosts
+-- Calculates Total Luck: Dice Base Luck × Fever (+50%) × (1 + Fortune Blessing Bonus)
 function RollService.GetTotalLuck(player: Player): number
 	local diceDef = getPlayerDice(player)
 	local diceLuck = diceDef.baseLuck or 1
 	local feverLuck = TapService.GetLuckMultiplier(player)
-	return diceLuck * feverLuck
+	local fortuneBonus = BlessingService.GetFortuneLuckBonus(player)
+	return diceLuck * feverLuck * (1 + fortuneBonus)
 end
 
 -- Core roll selection algorithm:

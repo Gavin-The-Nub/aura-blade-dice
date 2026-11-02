@@ -48,6 +48,7 @@ ReplicatedStorage/
       HUD/       -- MainHUD
 ServerScriptService/
   Main (Script)  -- starts all services
+  BlessingService (ModuleScript)  -- lives at ServerScriptService/BlessingService (server-only aggregator, not started by Main)
   PlayerActionLock (ModuleScript) -- lives at ServerScriptService/PlayerActionLock (not in Services/)
   AutoRollRunner (ModuleScript)   -- lives at ServerScriptService/AutoRollRunner (not in Services/)
   EconSim (ModuleScript)          -- lives at ServerScriptService/EconSim (not in Services/)
@@ -63,7 +64,11 @@ If you want to change this structure, ask me first.
 
 ## 6. Game math (from the GDD, implement exactly)
 
-- **Luck:** `Total Luck = Dice Base Luck × Rebirth Luck × Enchant Luck × Potion/Server boosts`
+- **Luck Formulas:**
+  - **Sword Roll Luck:** `Total Sword Luck = Dice Base Luck × Rebirth Luck × Enchant passive Luck (data only, not applied yet) × Fever (1.5×) × (1 + Fortune Blessing Bonus) × Potion/Server boosts`
+  - **Grade Roll Luck:** `Total Grade Luck = 1.0 + Appraiser's Eye Blessing Bonus` (rolled at Master Appraiser)
+  - **Enchant Roll Luck:** `Total Enchant Luck = 1.0 + Enchanter's Soul Blessing Bonus` (rolled at Enchanter)
+  - **Blessings.Caps:** Defined in `Config/Blessings.Caps` (placeholders: `FortuneLuck = 1.0` (+100%), `GradeLuck = 1.0` (+100%), `EnchantLuck = 1.0` (+100%)). Active blessings sum within a family across the equipped sword plus placed pedestal swords up to player's `PedestalSlots` (each unique sword uid counted once), then clamp to the cap.
 - **Roll odds & Cooldown:** `Effective Odds = max(1, Sword Base Odds / Total Luck)`. Roll cooldown is **global** (`Config/Game.Roll.Cooldown`, baseline 3.0s placeholder), not per Dice.
 - **Dice Ladder:** 29-tier progression table (Basic Dice up to Zenith Dice). Players can purchase any tier with Gold in any order and switch/equip any owned Dice tier at will.
 - **Gold per tap:** `Base Damage × Grade × Enchant × Rebirth × Crit`

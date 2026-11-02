@@ -26,7 +26,8 @@ export type RunnerConfig = {
 	CurrencyCost: number,             -- typically 1
 	SwordField: string,               -- "grade" or "enchant"
 	ProgressEventName: string,        -- "AutoGradeProgress" or "AutoEnchantProgress"
-	RollFn: () -> RollResultItem,
+	RollFn: (luck: number) -> RollResultItem,
+	GetLuckFn: ((player: Player) -> number)?,
 	GetRankFn: (name: string?) -> number,
 	GetLoopInterval: () -> number,
 	ActionNoun: string,               -- "Appraise" or "Enchant"
@@ -143,8 +144,9 @@ function AutoRollRunner.new(config: RunnerConfig): AutoRollRunnerInstance
 			local currentFieldVal = targetEntry[config.SwordField]
 			oldValue = if typeof(currentFieldVal) == "string" then currentFieldVal else ""
 
-			-- Execute weighted roll
-			local rolledItem = config.RollFn()
+			-- Execute roll with player's current luck (read inside lock)
+			local currentLuck = if config.GetLuckFn then config.GetLuckFn(player) else 1.0
+			local rolledItem = config.RollFn(currentLuck)
 			newValue = rolledItem.name
 
 			-- Clone list and entry, update field
@@ -377,8 +379,9 @@ function AutoRollRunner.new(config: RunnerConfig): AutoRollRunnerInstance
 						return
 					end
 
-					-- Perform weighted roll
-					local rolledItem = config.RollFn()
+					-- Perform roll with player's current luck (re-read inside lock on every iteration)
+					local currentLuck = if config.GetLuckFn then config.GetLuckFn(player) else 1.0
+					local rolledItem = config.RollFn(currentLuck)
 					rolledValueName = rolledItem.name
 
 					local updatedSwords = table.clone(currentSwords)

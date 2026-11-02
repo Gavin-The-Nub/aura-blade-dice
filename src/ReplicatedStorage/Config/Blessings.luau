@@ -30,7 +30,7 @@ local list: { BlessingDef } = {
 		rollChance = 18.0, -- PLACEHOLDER
 		badgeColor = "AuraCyan",
 		effectValues = { rollLuck = 0.05 },
-		effectText = "+5% Global Roll Luck",
+		effectText = "+5% Sword Roll Luck",
 	},
 	{
 		name = "Fortune II",
@@ -39,7 +39,7 @@ local list: { BlessingDef } = {
 		rollChance = 8.0, -- PLACEHOLDER
 		badgeColor = "AuraBlue",
 		effectValues = { rollLuck = 0.12 },
-		effectText = "+12% Global Roll Luck",
+		effectText = "+12% Sword Roll Luck",
 	},
 	{
 		name = "Fortune III",
@@ -48,7 +48,7 @@ local list: { BlessingDef } = {
 		rollChance = 2.0, -- PLACEHOLDER
 		badgeColor = "AuraGold",
 		effectValues = { rollLuck = 0.25 },
-		effectText = "+25% Global Roll Luck",
+		effectText = "+25% Sword Roll Luck",
 	},
 	{
 		name = "Greed I",
@@ -129,6 +129,13 @@ local Blessings = {}
 Blessings.List = list
 Blessings.MinCost = MinCost
 Blessings.CostFraction = CostFraction
+
+-- Caps for aggregated blessing effects (placeholders: +100% cap each)
+Blessings.Caps = {
+	FortuneLuck = 1.0, -- +100% sword roll luck
+	GradeLuck = 1.0,   -- +100% grade roll luck
+	EnchantLuck = 1.0, -- +100% enchant roll luck
+}
 
 function Blessings.GetBlessingDef(name: string?): BlessingDef?
 	if name == nil or name == "" then

@@ -9,6 +9,7 @@ export type EnchantDef = {
 	multiplier: number, -- Gold & Damage multiplier
 	badgeColor: string, -- Key in Theme.Colors, e.g. "AuraPurple"
 	effectText: string, -- Bonus passive effect description
+	baseOdds: number?, -- Conditional waterfall base odds
 }
 
 local list: { EnchantDef } = {
@@ -142,18 +143,68 @@ function Enchants.GetExpectedTokens(targetEnchant: string?): number
 	return 100 / totalChance
 end
 
--- Performs a server-side weighted roll using Config chances
-function Enchants.RollRandomEnchant(): EnchantDef
-	-- Total weight is 100.0 (40 + 25 + 15 + 10 + 6 + 2.8 + 1 + 0.18 + 0.02)
-	local roll = math.random() * 100.0
-	local cumulative = 0.0
-	for _, def in ipairs(list) do
-		cumulative += def.rollChance
-		if roll <= cumulative then
+-- Sort tiers by weight ascending explicitly (rarest first: Singularity -> Genesis -> Transcendent ... -> Sharpness)
+local waterfallEnchants: { EnchantDef } = table.clone(list)
+table.sort(waterfallEnchants, function(a, b)
+	return a.rollChance < b.rollChance
+end)
+
+-- Compute conditional waterfall baseOdds dynamically from Config weights:
+-- For step i (from rarest down to second-most common):
+-- baseOdds_i = remaining weight before tier / tier weight
+-- The common fallback absorbs the remainder.
+local remainingEnchantWeight = 0
+for _, def in waterfallEnchants do
+	remainingEnchantWeight += def.rollChance
+end
+
+for i = 1, #waterfallEnchants - 1 do
+	local def = waterfallEnchants[i]
+	def.baseOdds = remainingEnchantWeight / def.rollChance
+	remainingEnchantWeight -= def.rollChance
+end
+
+local mostCommonEnchant = waterfallEnchants[#waterfallEnchants]
+mostCommonEnchant.baseOdds = 1.0
+
+-- Analytic check: verify probabilities sum to 100.0% (1.0) at luck = 1.0
+local function computeAnalyticProbSum(): number
+	local runningMissProbability = 1.0
+	local sum = 0.0
+	for i = 1, #waterfallEnchants - 1 do
+		local def = waterfallEnchants[i]
+		local p = 1.0 / (def.baseOdds :: number)
+		local prob = runningMissProbability * p
+		sum += prob
+		runningMissProbability *= (1.0 - p)
+	end
+	sum += runningMissProbability
+	return sum
+end
+
+local analyticProbSum = computeAnalyticProbSum()
+assert(math.abs(analyticProbSum - 1.0) < 1e-6, ("[Enchants] Waterfall probabilities do not sum to 100%% (got %f)"):format(analyticProbSum))
+
+function Enchants.GetAnalyticSum(): number
+	return analyticProbSum
+end
+
+function Enchants.GetWaterfallList(): { EnchantDef }
+	return waterfallEnchants
+end
+
+-- Performs a server-side waterfall roll with optional luck (defaults to 1.0)
+function Enchants.RollRandomEnchant(luck: number?): EnchantDef
+	local effectiveLuck = if typeof(luck) == "number" and luck > 0 then luck else 1.0
+	for i = 1, #waterfallEnchants - 1 do
+		local def = waterfallEnchants[i]
+		local effectiveOdds = math.max(1, (def.baseOdds :: number) / effectiveLuck)
+		local chance = 1 / effectiveOdds
+		if math.random() <= chance then
 			return def
 		end
 	end
-	return list[#list]
+	return mostCommonEnchant
 end
 
 function Enchants.GetAll(): { EnchantDef }

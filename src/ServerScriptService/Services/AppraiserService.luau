@@ -12,6 +12,7 @@ local GameConfig = require(ReplicatedStorage.Config.Game)
 local Grades = require(ReplicatedStorage.Config.Grades)
 local Remotes = require(ReplicatedStorage.Shared.Remotes)
 local AutoRollRunner = require(ServerScriptService.AutoRollRunner)
+local BlessingService = require(ServerScriptService.BlessingService)
 
 local runner = AutoRollRunner.new({
 	CurrencyKey = "Gems",
@@ -19,6 +20,7 @@ local runner = AutoRollRunner.new({
 	SwordField = "grade",
 	ProgressEventName = "AutoGradeProgress",
 	RollFn = Grades.RollRandomGrade,
+	GetLuckFn = BlessingService.GetGradeLuck,
 	GetRankFn = Grades.GetRank,
 	GetLoopInterval = function(): number
 		local appraiserCfg = GameConfig.Appraiser
