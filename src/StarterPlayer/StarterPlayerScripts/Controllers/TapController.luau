@@ -65,7 +65,7 @@ function TapController.Init(hud: MainHUDInstance)
 	-- Listen for verified tap results from the server
 	if tapResultEvent then
 		tapResultEvent.OnClientEvent:Connect(function(goldEarned: unknown, isCrit: unknown)
-			if type(goldEarned) ~= "number" then
+			if type(goldEarned) ~= "number" or goldEarned <= 0 then
 				return
 			end
 			local crit = if type(isCrit) == "boolean" then isCrit else false

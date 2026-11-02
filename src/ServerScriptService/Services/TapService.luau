@@ -14,6 +14,7 @@ local Enchants = require(ReplicatedStorage.Config.Enchants)
 local Remotes = require(ReplicatedStorage.Shared.Remotes)
 local DataService = require(ServerScriptService.Services.DataService)
 local BlessingService = require(ServerScriptService.BlessingService)
+local GoldCredit = require(ServerScriptService.GoldCredit)
 
 type Bucket = {
 	tokens: number,
@@ -315,10 +316,13 @@ local function executeTap(player: Player): boolean
 
 	local goldEarned, isCrit = calculateTapEarnings(player)
 
-	-- Increment player's Gold via DataService
-	if DataService.Increment(player, "Gold", goldEarned) then
-		local tapResultEvent = Remotes.getEvent("TapResult")
-		tapResultEvent:FireClient(player, goldEarned, isCrit)
+	-- Increment player's Gold via GoldCredit with fractional remainder carry
+	local ok, wholeCredited = GoldCredit.Credit(player, goldEarned)
+	if ok then
+		if wholeCredited > 0 then
+			local tapResultEvent = Remotes.getEvent("TapResult")
+			tapResultEvent:FireClient(player, wholeCredited, isCrit)
+		end
 
 		-- Fever progress: only charge when Fever is NOT active
 		local fever = getFeverState(player)

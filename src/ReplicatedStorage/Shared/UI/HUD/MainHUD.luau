@@ -1022,7 +1022,7 @@ function MainHUD.new(parentGui: Instance): MainHUDInstance
 	local MAX_ACTIVE_DAMAGE_NUMBERS = 20
 
 	local function spawnFloatingDamageNumber(pos: Vector2, amount: number, isCrit: boolean)
-		if activeDamageNumbers >= MAX_ACTIVE_DAMAGE_NUMBERS then
+		if amount <= 0 or activeDamageNumbers >= MAX_ACTIVE_DAMAGE_NUMBERS then
 			return
 		end
 		activeDamageNumbers += 1

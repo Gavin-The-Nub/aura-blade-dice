@@ -83,7 +83,7 @@ When the GDD has a table, copy it into the matching Config module faithfully.
 
 ## 7. Big numbers
 
-Costs reach Septillion scale. Use normal Luau numbers (doubles). Always display values through `Shared/NumberFormat` (for example `5e24` becomes `5Sp`). Never display raw floats in the UI. Round Gold to whole numbers when saving.
+Costs reach Septillion scale. Use normal Luau numbers (doubles). Always display values through `Shared/NumberFormat` (for example `5e24` becomes `5Sp`). Never display raw floats in the UI. Round Gold to whole numbers when saving. Fractional Gold credits (taps, passive) go through GoldCredit; offline income is rounded once.
 
 ## 8. How to work with me
 

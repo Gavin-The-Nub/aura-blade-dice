@@ -242,8 +242,8 @@ end
 -- Returns true if dummy reacted, or false if out of range / dummy not found / error.
 function TargetDummyController.OnTapResult(goldEarned: number, isCrit: boolean): boolean
 	local ok, handled = pcall(function(): boolean
-		-- Validate goldEarned is a valid finite number
-		if type(goldEarned) ~= "number" or goldEarned ~= goldEarned or math.abs(goldEarned) == math.huge or goldEarned < 0 then
+		-- Validate goldEarned is a valid positive number
+		if type(goldEarned) ~= "number" or goldEarned ~= goldEarned or math.abs(goldEarned) == math.huge or goldEarned <= 0 then
 			return false
 		end
 

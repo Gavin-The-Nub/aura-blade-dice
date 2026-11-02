@@ -16,6 +16,7 @@ local Theme = require(ReplicatedStorage.Shared.Theme)
 local DataService = require(ServerScriptService.Services.DataService)
 local TapService = require(ServerScriptService.Services.TapService)
 local BlessingService = require(ServerScriptService.BlessingService)
+local GoldCredit = require(ServerScriptService.GoldCredit)
 local PlayerActionLock = require(ServerScriptService.PlayerActionLock)
 
 local PLOT_TAG = "Plot"
@@ -1061,7 +1062,7 @@ function PlotService.Start()
 						end
 
 						if totalPlayerPassiveGold > 0 then
-							DataService.Increment(player, "Gold", totalPlayerPassiveGold)
+							GoldCredit.Credit(player, totalPlayerPassiveGold)
 						end
 					end
 				end

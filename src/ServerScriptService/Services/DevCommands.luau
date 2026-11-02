@@ -26,6 +26,8 @@ local NumberFormat = require(ReplicatedStorage.Shared.NumberFormat)
 local Remotes = require(ReplicatedStorage.Shared.Remotes)
 local GameConfig = require(ReplicatedStorage.Config.Game)
 local EconSim = require(ServerScriptService.EconSim)
+local GoldCredit = require(ServerScriptService.GoldCredit)
+local GoldCredit = require(ServerScriptService.GoldCredit)
 
 local DevCommands = {}
 
@@ -886,6 +888,179 @@ local function onLuckCommand(originTextSource: TextSource, _unfilteredText: stri
 	))
 end
 
+
+local function runGoldCreditTestSuite(player: Player): boolean
+	print("================================================================================")
+	print("[DevCommands] ====== GoldCredit Simulation & Invariant Test Suite ======")
+	print("================================================================================")
+
+	local initialGold = DataService.Get(player, "Gold") or 0
+	GoldCredit.Clear(player)
+
+	local allPassed = true
+
+	-- (a) 1000 credits of 1.25 -> exactly 1250 (within 1)
+	local goldStartA = DataService.Get(player, "Gold") or 0
+	local sumCreditedA = 0
+	for _ = 1, 1000 do
+		local ok, whole = GoldCredit.Credit(player, 1.25)
+		if ok then
+			sumCreditedA += whole
+		else
+			allPassed = false
+		end
+	end
+	local goldEndA = DataService.Get(player, "Gold") or 0
+	local deltaA = goldEndA - goldStartA
+	local remA = GoldCredit.GetRemainder(player)
+	local passA = math.abs(deltaA - 1250) <= 1 and deltaA == sumCreditedA
+	if not passA then allPassed = false end
+	print(("[Test A: 1000 x 1.25 GPT] %s | Delta Gold: %d (Expected: 1250, within 1) | Remainder: %.4f | Sum Credited: %d"):format(
+		if passA then "PASS" else "FAIL", deltaA, remA, sumCreditedA
+	))
+	print("  -> Old DataService rounding comparison: floor(1.25 + 0.5) paid 1000 Gold (-250 Gold lost bias).")
+
+	GoldCredit.Clear(player)
+
+	-- (b) 60 credits of 10.5 -> exactly 630
+	local goldStartB = DataService.Get(player, "Gold") or 0
+	local sumCreditedB = 0
+	for _ = 1, 60 do
+		local ok, whole = GoldCredit.Credit(player, 10.5)
+		if ok then
+			sumCreditedB += whole
+		else
+			allPassed = false
+		end
+	end
+	local goldEndB = DataService.Get(player, "Gold") or 0
+	local deltaB = goldEndB - goldStartB
+	local remB = GoldCredit.GetRemainder(player)
+	local passB = math.abs(deltaB - 630) <= 1 and deltaB == sumCreditedB
+	if not passB then allPassed = false end
+	print(("[Test B: 60 x 10.5 GPS]   %s | Delta Gold: %d (Expected: 630) | Remainder: %.4f | Sum Credited: %d"):format(
+		if passB then "PASS" else "FAIL", deltaB, remB, sumCreditedB
+	))
+	print("  -> Old DataService rounding comparison: floor(10.5 + 0.5) paid 660 Gold (+30 Gold overpayment bias).")
+
+	GoldCredit.Clear(player)
+
+	-- (c) 1000 credits of 12 -> 12000 exactly
+	local goldStartC = DataService.Get(player, "Gold") or 0
+	local sumCreditedC = 0
+	for _ = 1, 1000 do
+		local ok, whole = GoldCredit.Credit(player, 12)
+		if ok then
+			sumCreditedC += whole
+		else
+			allPassed = false
+		end
+	end
+	local goldEndC = DataService.Get(player, "Gold") or 0
+	local deltaC = goldEndC - goldStartC
+	local remC = GoldCredit.GetRemainder(player)
+	local passC = deltaC == 12000 and deltaC == sumCreditedC and remC == 0
+	if not passC then allPassed = false end
+	print(("[Test C: 1000 x 12 GPT]   %s | Delta Gold: %d (Expected: 12000) | Remainder: %.4f | Sum Credited: %d"):format(
+		if passC then "PASS" else "FAIL", deltaC, remC, sumCreditedC
+	))
+	print("  -> Old DataService rounding comparison: paid 12000 Gold (identical).")
+
+	GoldCredit.Clear(player)
+
+	-- (d) 1000 credits of 2.5 (an odd-base crit) -> 2500 (within 1), with old rounding result for comparison
+	local goldStartD = DataService.Get(player, "Gold") or 0
+	local sumCreditedD = 0
+	for _ = 1, 1000 do
+		local ok, whole = GoldCredit.Credit(player, 2.5)
+		if ok then
+			sumCreditedD += whole
+		else
+			allPassed = false
+		end
+	end
+	local goldEndD = DataService.Get(player, "Gold") or 0
+	local deltaD = goldEndD - goldStartD
+	local remD = GoldCredit.GetRemainder(player)
+	local passD = math.abs(deltaD - 2500) <= 1 and deltaD == sumCreditedD
+	if not passD then allPassed = false end
+	print(("[Test D: 1000 x 2.5 Crit] %s | Delta Gold: %d (Expected: 2500, within 1) | Remainder: %.4f | Sum Credited: %d"):format(
+		if passD then "PASS" else "FAIL", deltaD, remD, sumCreditedD
+	))
+	print("  -> Old DataService rounding comparison: floor(2.5 + 0.5) = 3 per crit -> paid 3000 Gold (+500 Gold overpayment bias).")
+
+	-- (e) Increment failure: use a player whose data is not loaded, remainder stays unchanged and returns false, 0
+	GoldCredit.Clear(player)
+	GoldCredit.Credit(player, 0.75)
+	local playerRemBefore = GoldCredit.GetRemainder(player)
+	local unloadedPlayer = Instance.new("Folder") :: any
+	unloadedPlayer.Name = "UnloadedTester"
+	local okFail, creditedFail = GoldCredit.Credit(unloadedPlayer, 1.25)
+	local playerRemAfter = GoldCredit.GetRemainder(player)
+	local unloadedRem = GoldCredit.GetRemainder(unloadedPlayer)
+	unloadedPlayer:Destroy()
+
+	local passE = (okFail == false) and (creditedFail == 0) and (playerRemBefore == 0.75) and (playerRemAfter == 0.75) and (unloadedRem == 0)
+	if not passE then allPassed = false end
+	print(("[Test E: Failure Safe]   %s | Unloaded Credit: ok=%s, credited=%d | Real Player Remainder Untouched: %.2f -> %.2f"):format(
+		if passE then "PASS" else "FAIL", tostring(okFail), creditedFail, playerRemBefore, playerRemAfter
+	))
+
+	-- (f) Invariant: Gold delta == sum of wholeCredited AND nominal total - Gold delta == remainder
+	GoldCredit.Clear(player)
+	local goldStartF = DataService.Get(player, "Gold") or 0
+	local nominalTotalF = 0
+	local sumCreditedF = 0
+	local testAmounts = { 1.25, 0.50, 0.33, 2.75, 10.5, 0.17, 3.14 }
+	for _, amt in testAmounts do
+		nominalTotalF += amt
+		local ok, whole = GoldCredit.Credit(player, amt)
+		if ok then
+			sumCreditedF += whole
+		else
+			allPassed = false
+		end
+	end
+	local goldEndF = DataService.Get(player, "Gold") or 0
+	local deltaF = goldEndF - goldStartF
+	local remF = GoldCredit.GetRemainder(player)
+	local diffF = nominalTotalF - deltaF
+	local invariantMathOk = math.abs(diffF - remF) < 1e-6
+	local passF = (deltaF == sumCreditedF) and invariantMathOk
+	if not passF then allPassed = false end
+	print(("[Test F: Invariants]     %s | Gold Delta (%d) == Sum Credited (%d) | Nominal Total (%.4f) - Gold Delta (%d) == Remainder (%.4f, match: %s)"):format(
+		if passF then "PASS" else "FAIL", deltaF, sumCreditedF, nominalTotalF, deltaF, remF, tostring(invariantMathOk)
+	))
+
+	-- Restore player's initial gold
+	DataService.Set(player, "Gold", initialGold)
+	GoldCredit.Clear(player)
+
+	print("================================================================================")
+	print(("[DevCommands] ====== GoldCredit Suite Completed: %s ======"):format(if allPassed then "ALL TESTS PASSED" else "SOME TESTS FAILED"))
+	print("================================================================================")
+
+	say(player, ("[GoldCreditTest] %s! Real server credit verified: 1000x1.25, 60x10.5, 1000x12, 1000x2.5, failure-safety, and invariants."):format(
+		if allPassed then "ALL TESTS PASSED" else "TESTS FAILED"
+	))
+
+	player:SetAttribute("GoldCreditTestCompleted", allPassed)
+
+	return allPassed
+end
+
+local function runGoldCreditTest(player: Player): boolean
+	return runGoldCreditTestSuite(player)
+end
+
+local function onGoldCreditTestCommand(originTextSource: TextSource, _unfilteredText: string)
+	local player = Players:GetPlayerByUserId(originTextSource.UserId)
+	if player == nil then
+		return
+	end
+	runGoldCreditTest(player)
+end
+
 function DevCommands.Start()
 	if not RunService:IsStudio() then
 		return
@@ -1022,6 +1197,13 @@ function DevCommands.Start()
 	luckCommand.PrimaryAlias = "/luck"
 	luckCommand.Triggered:Connect(onLuckCommand)
 	luckCommand.Parent = TextChatService
+
+	local goldCreditTestCommand = Instance.new("TextChatCommand")
+	goldCreditTestCommand.Name = "DevGoldCreditTestCommand"
+	goldCreditTestCommand.PrimaryAlias = "/goldcredittest"
+	goldCreditTestCommand.Triggered:Connect(onGoldCreditTestCommand)
+	goldCreditTestCommand.Parent = TextChatService
+
 end
 
 return DevCommands

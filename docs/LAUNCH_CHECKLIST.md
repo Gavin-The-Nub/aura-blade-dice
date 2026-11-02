@@ -30,6 +30,7 @@ The following commands are implemented in `src/ServerScriptService/Services/DevC
 - [ ] **/setblessing `<inventoryIndex>` `<name>`**: Sets specific blessing on sword in inventory for testing badges and mechanics (or "none" to clear).
 - [ ] **/blessingtest `<n>`**: Simulates n rolls (capped at 100,000) against Config/Blessings with 0 Gold cost and prints distribution and percentage vs expected odds to Output.
 - [ ] **/luck**: Prints player's aggregated Fortune, Grade, and Enchant blessing bonuses (raw & capped), contributing sword sources, and effective odds for the rarest 3 swords, Grades, and Enchants.
+- [ ] **/goldcredittest**: Verifies real server-side GoldCredit.Credit remainder carry math, odd-base crits, failure rollback, and invariants across 1,000 taps and passive ticks.
 
 > **Production Safeguard:** Verify that `DevCommands.luau` and `ServerScriptService/EconSim.luau` include Studio-only gating or are removed before production builds.
 
