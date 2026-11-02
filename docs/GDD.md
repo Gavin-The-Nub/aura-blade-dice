@@ -166,7 +166,7 @@ Players can spend **Gold** at the Runesmith to roll a utility **Hilt Blessing** 
 * **Greed I / II / III:** $+10\% / +25\% / +50\%$ Gold earned from taps and pedestals (applies to active taps, Auto-Tap, passive pedestal income, and offline income; does NOT apply to sword sale price, Gems, Tokens, or Trial rewards).
 * **Appraiser's Eye:** $+20\%$ Luck when rolling for **Grades**. Affects **Grade rolls** at Master Appraiser.
 * **Enchanter's Soul:** $+20\%$ Luck when rolling for **Enchants**. Affects **Enchant rolls** at Enchanter.
-* **Swiftfoot:** $+15\%$ Player WalkSpeed and $+10\%$ Auto-Tap Speed.
+* **Swiftfoot:** $+15\%$ Player WalkSpeed and $+10\%$ Auto-Tap Speed. Manual taps share the higher rate limit allowance.
 
 **Stacking Rule & Caps:**
 * **Stacking Rule:** Active blessings sum within a family across the equipped sword plus placed pedestal swords up to the player's current `PedestalSlots`. Each unique sword `uid` is counted at most once (strict deduplication).
@@ -175,6 +175,8 @@ Players can spend **Gold** at the Runesmith to roll a utility **Hilt Blessing** 
   * **Greed Gold Cap:** $+200\%$ (`GreedGold = 2.0`, max $+200\%$ Gold earned)
   * **Grade Luck Cap:** $+100\%$ (`GradeLuck = 1.0`, max $+100\%$ Grade Luck)
   * **Enchant Luck Cap:** $+100\%$ (`EnchantLuck = 1.0`, max $+100\%$ Enchant Luck)
+  * **Swiftfoot WalkSpeed Cap:** $+50\%$ (`SwiftfootWalk = 0.5`, max $+50\%$ WalkSpeed, $24\text{ studs/s}$)
+  * **Swiftfoot Auto-Tap Cap:** $+50\%$ (`SwiftfootAutoTap = 0.5`, max $+50\%$ Auto-Tap speed, $15\text{ taps/s}$ or $30\text{ taps/s}$ during Fever)
 
 ---
 

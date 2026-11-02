@@ -10,6 +10,7 @@
 -- - Freezes cached table and its sources list for immutability
 -- - Returns zero bonuses without erroring if player data is not loaded
 -- - Clamps summed family bonuses against Config/Blessings.Caps
+-- - Server-side WalkSpeed application on CharacterAdded, respawn, and blessing changes
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -35,6 +36,10 @@ export type BlessingBonuses = {
 	gradeCapped: number,
 	enchantRaw: number,
 	enchantCapped: number,
+	swiftWalkRaw: number,
+	swiftWalkCapped: number,
+	swiftTapRaw: number,
+	swiftTapCapped: number,
 	sources: { BlessingSource },
 }
 
@@ -47,6 +52,10 @@ local ZERO_BONUSES: BlessingBonuses = table.freeze({
 	gradeCapped = 0,
 	enchantRaw = 0,
 	enchantCapped = 0,
+	swiftWalkRaw = 0,
+	swiftWalkCapped = 0,
+	swiftTapRaw = 0,
+	swiftTapCapped = 0,
 	sources = table.freeze({}),
 })
 
@@ -61,7 +70,7 @@ function BlessingService.InvalidateCache(player: Player)
 	end
 end
 
--- Returns the full breakdown of aggregated raw and capped luck/gold bonuses and contributing sources
+-- Returns the full breakdown of aggregated raw and capped luck/gold/swiftfoot bonuses and contributing sources
 function BlessingService.GetBonuses(player: Player, dataServiceOverride: any?): BlessingBonuses
 	if player == nil then
 		return ZERO_BONUSES
@@ -117,6 +126,8 @@ function BlessingService.GetBonuses(player: Player, dataServiceOverride: any?): 
 	local rawGreed = 0
 	local rawGrade = 0
 	local rawEnchant = 0
+	local rawSwiftWalk = 0
+	local rawSwiftTap = 0
 
 	local function processCandidate(uid: unknown, slotLabel: string)
 		if typeof(uid) ~= "string" or uid == "" then
@@ -152,6 +163,9 @@ function BlessingService.GetBonuses(player: Player, dataServiceOverride: any?): 
 			rawGrade += def.effectValues.gradeLuck or 0
 		elseif def.family == "Enchanter" then
 			rawEnchant += def.effectValues.enchantLuck or 0
+		elseif def.family == "Swiftfoot" then
+			rawSwiftWalk += def.effectValues.walkSpeed or 0
+			rawSwiftTap += def.effectValues.autoTapSpeed or 0
 		end
 	end
 
@@ -164,11 +178,20 @@ function BlessingService.GetBonuses(player: Player, dataServiceOverride: any?): 
 		processCandidate(placedUid, ("Pedestal Slot #%d"):format(slotNum))
 	end
 
-	local caps = Blessings.Caps or { FortuneLuck = 1.0, GradeLuck = 1.0, EnchantLuck = 1.0, GreedGold = 2.0 }
+	local caps = Blessings.Caps or {
+		FortuneLuck = 1.0,
+		GradeLuck = 1.0,
+		EnchantLuck = 1.0,
+		GreedGold = 2.0,
+		SwiftfootWalk = 0.5,
+		SwiftfootAutoTap = 0.5,
+	}
 	local fortuneCap = caps.FortuneLuck or 1.0
 	local greedCap = caps.GreedGold or 2.0
 	local gradeCap = caps.GradeLuck or 1.0
 	local enchantCap = caps.EnchantLuck or 1.0
+	local swiftWalkCap = caps.SwiftfootWalk or 0.5
+	local swiftTapCap = caps.SwiftfootAutoTap or 0.5
 
 	local result: BlessingBonuses = table.freeze({
 		fortuneRaw = rawFortune,
@@ -179,6 +202,10 @@ function BlessingService.GetBonuses(player: Player, dataServiceOverride: any?): 
 		gradeCapped = math.min(rawGrade, gradeCap),
 		enchantRaw = rawEnchant,
 		enchantCapped = math.min(rawEnchant, enchantCap),
+		swiftWalkRaw = rawSwiftWalk,
+		swiftWalkCapped = math.min(rawSwiftWalk, swiftWalkCap),
+		swiftTapRaw = rawSwiftTap,
+		swiftTapCapped = math.min(rawSwiftTap, swiftTapCap),
 		sources = table.freeze(sources),
 	})
 
@@ -224,28 +251,85 @@ function BlessingService.GetEnchantLuck(player: Player): number
 	return 1.0 + BlessingService.GetEnchantLuckBonus(player)
 end
 
--- Lifecycle invalidation connections established immediately upon require:
+-- Returns capped Swiftfoot WalkSpeed bonus as a fraction (e.g. 0.15 for +15%, 0 if none)
+function BlessingService.GetSwiftWalkBonus(player: Player): number
+	return BlessingService.GetBonuses(player).swiftWalkCapped
+end
+
+-- Returns total WalkSpeed multiplier: 1.0 + swiftWalkBonus (e.g. 1.15 for +15%)
+function BlessingService.GetSwiftWalkMultiplier(player: Player): number
+	return 1.0 + BlessingService.GetSwiftWalkBonus(player)
+end
+
+-- Returns capped Swiftfoot Auto-Tap speed bonus as a fraction (e.g. 0.10 for +10%, 0 if none)
+function BlessingService.GetSwiftTapBonus(player: Player): number
+	return BlessingService.GetBonuses(player).swiftTapCapped
+end
+
+-- Returns total Auto-Tap speed multiplier: 1.0 + swiftTapBonus (e.g. 1.10 for +10%)
+function BlessingService.GetSwiftTapMultiplier(player: Player): number
+	return 1.0 + BlessingService.GetSwiftTapBonus(player)
+end
+
+-- Server-side WalkSpeed application directly to player's Humanoid
+local function applyPlayerWalkSpeed(player: Player)
+	if player == nil or player.Parent ~= Players then
+		return
+	end
+	local character = player.Character
+	if not character then
+		return
+	end
+	local humanoid = character:FindFirstChildOfClass("Humanoid")
+	if not humanoid then
+		return
+	end
+
+	local baseSpeed = (GameConfig.Player and GameConfig.Player.BaseWalkSpeed) or 16
+	local bonus = BlessingService.GetSwiftWalkBonus(player)
+	humanoid.WalkSpeed = baseSpeed * (1 + bonus)
+end
+
+function BlessingService.ApplyWalkSpeed(player: Player)
+	applyPlayerWalkSpeed(player)
+end
+
+local function onCharacterAdded(player: Player, character: Model)
+	local humanoid = character:WaitForChild("Humanoid", 5) :: Humanoid?
+	if humanoid then
+		applyPlayerWalkSpeed(player)
+	end
+end
+
+local function setupPlayer(player: Player)
+	BlessingService.InvalidateCache(player)
+
+	player.CharacterAdded:Connect(function(char)
+		onCharacterAdded(player, char)
+	end)
+	if player.Character then
+		onCharacterAdded(player, player.Character)
+	end
+
+	task.spawn(function()
+		if DataService.WaitForProfile(player) then
+			BlessingService.InvalidateCache(player)
+			applyPlayerWalkSpeed(player)
+		end
+	end)
+end
+
+-- Lifecycle invalidation and WalkSpeed connections established immediately upon require:
 DataService.Changed:Connect(function(player: Player, key: string, _value: any)
 	if key == "EquippedSword" or key == "PlacedSwords" or key == "PedestalSlots" or key == "OwnedSwords" then
 		BlessingService.InvalidateCache(player)
+		applyPlayerWalkSpeed(player)
 	end
 end)
 
-Players.PlayerAdded:Connect(function(player: Player)
-	BlessingService.InvalidateCache(player)
-	task.spawn(function()
-		if DataService.WaitForProfile(player) then
-			BlessingService.InvalidateCache(player)
-		end
-	end)
-end)
-
+Players.PlayerAdded:Connect(setupPlayer)
 for _, player in Players:GetPlayers() do
-	task.spawn(function()
-		if DataService.WaitForProfile(player) then
-			BlessingService.InvalidateCache(player)
-		end
-	end)
+	setupPlayer(player)
 end
 
 Players.PlayerRemoving:Connect(function(player: Player)

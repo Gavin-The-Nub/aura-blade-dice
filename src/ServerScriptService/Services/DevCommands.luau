@@ -730,6 +730,15 @@ local function onLuckCommand(originTextSource: TextSource, _unfilteredText: stri
 	local greedCap = (Blessings.Caps and Blessings.Caps.GreedGold) or 2.0
 	local gradeCap = (Blessings.Caps and Blessings.Caps.GradeLuck) or 1.0
 	local enchantCap = (Blessings.Caps and Blessings.Caps.EnchantLuck) or 1.0
+	local swiftWalkCap = (Blessings.Caps and Blessings.Caps.SwiftfootWalk) or 0.5
+	local swiftTapCap = (Blessings.Caps and Blessings.Caps.SwiftfootAutoTap) or 0.5
+
+	local baseWalkSpeed = (GameConfig.Player and GameConfig.Player.BaseWalkSpeed) or 16
+	local effectiveWalkSpeed = baseWalkSpeed * (1 + bonuses.swiftWalkCapped)
+	local baseTapRate = GameConfig.AutoTap.BaseTapsPerSecond
+	local feverMultiplier = GameConfig.Fever.SpeedMultiplier
+	local effectiveTapRate = baseTapRate * (1 + bonuses.swiftTapCapped)
+	local feverTapRate = effectiveTapRate * feverMultiplier
 
 	-- Equipped sword stats breakdown
 	local equippedEntry = TapService.GetEquippedEntry(player)
@@ -800,6 +809,19 @@ local function onLuckCommand(originTextSource: TextSource, _unfilteredText: stri
 		bonuses.enchantCapped * 100,
 		enchantCap * 100,
 		totalEnchantLuck
+	))
+	print(("[Swiftfoot Blessing] Raw Walk: +%.1f%% | Capped Walk: +%.1f%% (Cap: +%.1f%%) | WalkSpeed: %.1f studs/s"):format(
+		bonuses.swiftWalkRaw * 100,
+		bonuses.swiftWalkCapped * 100,
+		swiftWalkCap * 100,
+		effectiveWalkSpeed
+	))
+	print(("                     Raw Tap:  +%.1f%% | Capped Tap:  +%.1f%% (Cap: +%.1f%%) | Auto-Tap: %.1f taps/s (Fever: %.1f taps/s)"):format(
+		bonuses.swiftTapRaw * 100,
+		bonuses.swiftTapCapped * 100,
+		swiftTapCap * 100,
+		effectiveTapRate,
+		feverTapRate
 	))
 	print("--------------------------------------------------------------------------------")
 	print(("[Equipped Sword] %s | Base Damage: %.1f | Grade: %.2fx | Enchant: %.2fx | Greed: %.2fx | Gold per tap (no crit): %.2f"):format(
@@ -876,13 +898,16 @@ local function onLuckCommand(originTextSource: TextSource, _unfilteredText: stri
 	end
 	print("================================================================================")
 
-	say(player, ("[Luck] Fortune: +%.1f%% | Greed: +%.1f%% (Raw: +%.1f%%, x%.2f) | Grade: +%.1f%% | Enchant: +%.1f%% | GPT: %.2f | Passive: %.2f/s"):format(
+	say(player, ("[Luck] Fortune: +%.1f%% | Greed: +%.1f%% (x%.2f) | Grade: +%.1f%% | Enchant: +%.1f%% | SwiftWalk: +%.1f%% (%.1f spd) | SwiftTap: +%.1f%% (%.1f taps/s) | GPT: %.2f | Passive: %.2f/s"):format(
 		bonuses.fortuneCapped * 100,
 		bonuses.greedCapped * 100,
-		bonuses.greedRaw * 100,
 		greedMultiplier,
 		bonuses.gradeCapped * 100,
 		bonuses.enchantCapped * 100,
+		bonuses.swiftWalkCapped * 100,
+		effectiveWalkSpeed,
+		bonuses.swiftTapCapped * 100,
+		effectiveTapRate,
 		goldPerTapNoCrit,
 		totalPassiveGps
 	))

@@ -26,6 +26,9 @@ local Game = {
 	Inventory = {
 		MaxSwords = 50, -- Maximum number of swords a player can store
 	},
+	Player = {
+		BaseWalkSpeed = 16, -- Default Roblox Humanoid WalkSpeed
+	},
 	Plot = {
 		MaxPlots = 8,
 		DefaultPedestalsPerPlot = 4,

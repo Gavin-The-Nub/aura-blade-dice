@@ -174,17 +174,11 @@ function TapService.IsFeverActive(player: Player): boolean
 	return isFeverActive(player)
 end
 
-function TapService.IsAutoTapActive(player: Player): boolean
-	return autoTapActive[player] == true
-end
-
--- Returns the max tap rate per second for a player (2x during Fever Mode)
+-- Returns the max tap rate per second for a player (scales with Swiftfoot blessing and 2x during Fever Mode)
 function TapService.getMaxTapRate(player: Player): number
-	local rate = GameConfig.Tap.MaxTapsPerSecond
-	if isFeverActive(player) then
-		rate *= GameConfig.Fever.SpeedMultiplier
-	end
-	return rate
+	local swiftTap = if player then BlessingService.GetSwiftTapBonus(player) else 0
+	local feverSpeed = if isFeverActive(player) then GameConfig.Fever.SpeedMultiplier else 1
+	return GameConfig.Tap.MaxTapsPerSecond * (1 + swiftTap) * feverSpeed
 end
 
 -- Global luck multiplier contribution from Fever (+50% during Fever Mode)
@@ -272,7 +266,9 @@ local function consumeTapToken(player: Player): boolean
 		playerBuckets[player] = bucket
 	else
 		local elapsed = now - bucket.lastRefill
-		bucket.tokens = math.min(capacity, bucket.tokens + (elapsed * rate))
+		-- Clamp tokens to the new capacity when rate/capacity drops (Fever ends, Swiftfoot removed)
+		local clampedExisting = math.min(capacity, bucket.tokens)
+		bucket.tokens = math.min(capacity, clampedExisting + (elapsed * rate))
 		bucket.lastRefill = now
 	end
 
@@ -369,15 +365,35 @@ local function startAutoTap(player: Player)
 	autoTapStateEvent:FireClient(player, true)
 
 	autoTapThreads[player] = task.spawn(function()
-		while autoTapActive[player] and player.Parent == Players and DataService.IsLoaded(player) do
-			executeTap(player)
+		local lastTick = os.clock()
+		local acc = 0
 
-			-- Interval scales with Fever speed multiplier
-			local tapsPerSecond = GameConfig.AutoTap.BaseTapsPerSecond
-			if isFeverActive(player) then
-				tapsPerSecond *= GameConfig.Fever.SpeedMultiplier
+		while autoTapActive[player] and player.Parent == Players and DataService.IsLoaded(player) do
+			task.wait()
+			local now = os.clock()
+			local dt = now - lastTick
+			lastTick = now
+
+			-- Rate re-read every frame from BaseTapsPerSecond * (1 + swiftTap) * feverSpeed
+			local swiftTap = BlessingService.GetSwiftTapBonus(player)
+			local feverSpeed = if isFeverActive(player) then GameConfig.Fever.SpeedMultiplier else 1
+			local rate = GameConfig.AutoTap.BaseTapsPerSecond * (1 + swiftTap) * feverSpeed
+
+			acc += dt * rate
+			if acc > 3 then
+				acc = 3 -- clamp acc to at most 3 so a lag spike cannot burst
 			end
-			task.wait(1 / tapsPerSecond)
+
+			local tapsToRun = math.min(3, math.floor(acc)) -- cap taps per frame at 3
+			if tapsToRun > 0 then
+				acc -= tapsToRun
+				for _ = 1, tapsToRun do
+					if not (autoTapActive[player] and player.Parent == Players and DataService.IsLoaded(player)) then
+						break
+					end
+					executeTap(player)
+				end
+			end
 		end
 
 		if autoTapActive[player] then
