@@ -171,8 +171,9 @@ function SwordSelectorPopup.new(parentGui: Instance): SwordSelectorPopupInstance
 	sectionHeader.Font = Theme.Fonts.Button
 	sectionHeader.TextSize = 12
 	sectionHeader.TextColor3 = Theme.Colors.TextSecondary
-	sectionHeader.TextXAlignment = Enum.TextXAlignment.Left
-	sectionHeader.Text = "AVAILABLE SWORDS IN BACKPACK (50% PASSIVE INCOME):"
+	local passiveMult = (GameConfig.Plot and GameConfig.Plot.PassiveRateMultiplier) or 2.0
+	local passivePct = math.round(passiveMult * 100)
+	sectionHeader.Text = string.format("AVAILABLE SWORDS IN BACKPACK (%d%% PASSIVE INCOME):", passivePct)
 	sectionHeader.Parent = rootContent
 
 	-- Scrolling container for candidates

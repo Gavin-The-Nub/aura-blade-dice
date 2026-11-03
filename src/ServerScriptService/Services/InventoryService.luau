@@ -5,14 +5,17 @@
 local HttpService = game:GetService("HttpService")
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local RunService = game:GetService("RunService")
 local ServerScriptService = game:GetService("ServerScriptService")
 
 local Swords = require(ReplicatedStorage.Config.Swords)
+local Blessings = require(ReplicatedStorage.Config.Blessings)
 local GameConfig = require(ReplicatedStorage.Config.Game)
 local Remotes = require(ReplicatedStorage.Shared.Remotes)
 local SalePrice = require(ReplicatedStorage.Shared.SalePrice)
 local DataService = require(ServerScriptService.Services.DataService)
 local TapService = require(ServerScriptService.Services.TapService)
+local BlessingService = require(ServerScriptService.BlessingService)
 local PlayerActionLock = require(ServerScriptService.PlayerActionLock)
 
 local InventoryService = {}
@@ -303,6 +306,37 @@ type SellSnapshot = {
 
 local sellSnapshots: { [Player]: SellSnapshot } = {}
 
+type EquipBestSnapshot = {
+	token: string,
+	createdAt: number,
+	owned: { any },
+	equippedUid: string,
+	placedMap: { [string]: string },
+	pedestalSlots: number,
+}
+
+local equipBestSnapshots: { [Player]: EquipBestSnapshot } = {}
+
+-- Clear equip best confirmation snapshot from ONE place on state changes
+local snapshotListenerDisabled = false
+DataService.Changed:Connect(function(player: Player, key: string, _value: unknown)
+	if snapshotListenerDisabled then
+		return
+	end
+	if key == "EquippedSword" or key == "PlacedSwords" or key == "OwnedSwords" or key == "PedestalSlots" then
+		equipBestSnapshots[player] = nil
+	end
+end)
+
+if RunService:IsStudio() then
+	(InventoryService :: any)._setSnapshotListenerDisabled = function(disabled: boolean)
+		snapshotListenerDisabled = disabled
+	end
+	(InventoryService :: any)._getSnapshotForTest = function(p: Player)
+		return equipBestSnapshots[p]
+	end
+end
+
 -- Previews Sell All: collects eligible swords (not equipped, not placed, not locked)
 -- and saves a server snapshot that expires after 60 seconds.
 function InventoryService.GetSellAllPreview(player: Player): (boolean, any?, string?)
@@ -500,85 +534,209 @@ end
 
 -- Equips the single best sword and assigns the next PedestalSlots swords onto pedestals 1..PedestalSlots.
 -- Atomically writes EquippedSword and PlacedSwords via DataService.SetMany.
-function InventoryService.EquipBest(player: Player): (boolean, string?)
+-- If any blessed sword would be unequipped or unplaced, generates a 30s confirmation token and returns preview data.
+function InventoryService.EquipBest(player: Player, bypassWarning: boolean?): (boolean, string?, any?)
 	if not checkRateLimit(player) then
-		return false, "Action rate limited. Please slow down."
+		return false, "Action rate limited. Please slow down.", nil
 	end
 
 	if not DataService.IsLoaded(player) then
-		return false, "Data is loading..."
+		return false, "Data is loading...", nil
 	end
 
+	local ownedSwords = DataService.Get(player, "OwnedSwords")
+	if typeof(ownedSwords) ~= "table" or #ownedSwords == 0 then
+		return true, "No swords in inventory! Roll the dice to pull swords.", { needsConfirmation = false }
+	end
+
+	local oldEquipped = DataService.Get(player, "EquippedSword")
+	if typeof(oldEquipped) ~= "string" then
+		oldEquipped = ""
+	end
+
+	local oldPlaced = DataService.Get(player, "PlacedSwords")
+	local oldPlacedMap: { [string]: string } = {}
+	if typeof(oldPlaced) == "table" then
+		for k, v in oldPlaced do
+			if typeof(k) == "string" and typeof(v) == "string" then
+				oldPlacedMap[k] = v
+			end
+		end
+	end
+
+	local maxPedestals = (GameConfig.Plot and GameConfig.Plot.MaxPedestals) or 11
+	local rawSlots = DataService.Get(player, "PedestalSlots")
+	local pedestalSlots = if typeof(rawSlots) == "number" then rawSlots else ((GameConfig.Plot and GameConfig.Plot.DefaultPedestalsPerPlot) or 4)
+	pedestalSlots = math.clamp(math.floor(pedestalSlots), 1, maxPedestals)
+
+	-- Rank swords descending by Gold per tap (Greed-free)
+	local ranked = rankSwords(player, ownedSwords)
+
+	-- Top sword becomes equipped
+	local targetEquippedUid = ranked[1].uid
+
+	-- Next PedestalSlots swords go to pedestals 1..PedestalSlots
+	local targetPlaced: { [string]: string } = {}
+	local placedCount = 0
+	for slot = 1, pedestalSlots do
+		local candidateIdx = 1 + slot
+		if candidateIdx <= #ranked then
+			targetPlaced[tostring(slot)] = ranked[candidateIdx].uid
+			placedCount += 1
+		end
+	end
+
+	-- Check if anything changes (skip writes if nothing changes)
+	local sameEquipped = (targetEquippedUid == oldEquipped)
+	local samePlaced = true
+	for slot = 1, maxPedestals do
+		local k = tostring(slot)
+		if (targetPlaced[k] or "") ~= (oldPlacedMap[k] or "") then
+			samePlaced = false
+			break
+		end
+	end
+	for k, _ in oldPlacedMap do
+		if not targetPlaced[k] then
+			samePlaced = false
+			break
+		end
+	end
+
+	if sameEquipped and samePlaced then
+		return true, "Best swords already equipped and placed!", { needsConfirmation = false }
+	end
+
+	-- Compute preview of leaving and entering blessed swords and net blessing changes
+	local ownedByUid: { [string]: any } = {}
+	for _, entry in ipairs(ownedSwords) do
+		if typeof(entry) == "table" and typeof(entry.uid) == "string" then
+			ownedByUid[entry.uid] = entry
+		end
+	end
+
+	-- 1. Identify currently active blessed swords (equipped + active pedestals)
+	local currentlyActiveBlessings: { [string]: { slot: string, entry: any, def: Blessings.BlessingDef } } = {}
+	local seenActiveUids: { [string]: boolean } = {}
+
+	local function checkCurrentCandidate(uid: string?, slotLabel: string)
+		if typeof(uid) ~= "string" or uid == "" or seenActiveUids[uid] then
+			return
+		end
+		seenActiveUids[uid] = true
+		local entry = ownedByUid[uid]
+		if entry and typeof(entry.blessing) == "string" and entry.blessing ~= "" then
+			local def = Blessings.GetBlessingDef(entry.blessing)
+			if def then
+				currentlyActiveBlessings[uid] = { slot = slotLabel, entry = entry, def = def }
+			end
+		end
+	end
+
+	checkCurrentCandidate(oldEquipped, "Equipped")
+	for slot = 1, pedestalSlots do
+		checkCurrentCandidate(oldPlacedMap[tostring(slot)], ("Pedestal Slot #%d"):format(slot))
+	end
+
+	-- 2. Identify target active set
+	local targetActiveSet: { [string]: { slot: string, entry: any, def: Blessings.BlessingDef? } } = {}
+	local seenTargetUids: { [string]: boolean } = {}
+
+	local function registerTargetCandidate(uid: string?, slotLabel: string)
+		if typeof(uid) ~= "string" or uid == "" or seenTargetUids[uid] then
+			return
+		end
+		seenTargetUids[uid] = true
+		local entry = ownedByUid[uid]
+		local def = if entry and typeof(entry.blessing) == "string" and entry.blessing ~= "" then Blessings.GetBlessingDef(entry.blessing) else nil
+		targetActiveSet[uid] = { slot = slotLabel, entry = entry, def = def }
+	end
+
+	registerTargetCandidate(targetEquippedUid, "Equipped")
+	for slot = 1, pedestalSlots do
+		registerTargetCandidate(targetPlaced[tostring(slot)], ("Pedestal Slot #%d"):format(slot))
+	end
+
+	-- 3. Find leaving blessed swords
+	local leavingSwords = {}
+	for uid, info in currentlyActiveBlessings do
+		if not targetActiveSet[uid] then
+			local def = swordDefMap[info.entry.id]
+			table.insert(leavingSwords, {
+				uid = uid,
+				swordName = if def then def.name else info.entry.id,
+				slot = info.slot,
+				blessing = info.def.name,
+				family = info.def.family,
+				badgeColor = info.def.badgeColor,
+				effectText = info.def.effectText,
+			})
+		end
+	end
+	table.sort(leavingSwords, function(a, b)
+		return a.swordName < b.swordName
+	end)
+
+	-- 4. Find newly active blessed swords
+	local becomingActiveSwords = {}
+	for uid, info in targetActiveSet do
+		if info.def and not currentlyActiveBlessings[uid] then
+			local def = swordDefMap[info.entry.id]
+			table.insert(becomingActiveSwords, {
+				uid = uid,
+				swordName = if def then def.name else info.entry.id,
+				slot = info.slot,
+				blessing = info.def.name,
+				family = info.def.family,
+				badgeColor = info.def.badgeColor,
+				effectText = info.def.effectText,
+			})
+		end
+	end
+	table.sort(becomingActiveSwords, function(a, b)
+		return a.swordName < b.swordName
+	end)
+
+	-- 5. Calculate net changes (capped after minus capped before) using BlessingService.ComputeBonuses
+	local bonusesBefore = BlessingService.ComputeBonuses(ownedSwords, oldEquipped, oldPlacedMap, pedestalSlots)
+	local bonusesAfter = BlessingService.ComputeBonuses(ownedSwords, targetEquippedUid, targetPlaced, pedestalSlots)
+
+	local netChanges = {
+		Fortune = bonusesAfter.fortuneCapped - bonusesBefore.fortuneCapped,
+		Greed = bonusesAfter.greedCapped - bonusesBefore.greedCapped,
+		Grade = bonusesAfter.gradeCapped - bonusesBefore.gradeCapped,
+		Enchant = bonusesAfter.enchantCapped - bonusesBefore.enchantCapped,
+		SwiftfootWalk = bonusesAfter.swiftWalkCapped - bonusesBefore.swiftWalkCapped,
+		SwiftfootTap = bonusesAfter.swiftTapCapped - bonusesBefore.swiftTapCapped,
+	}
+
+	-- If blessed swords are leaving and bypassWarning is NOT true, prompt with confirm token
+	if #leavingSwords > 0 and bypassWarning ~= true then
+		local token = HttpService:GenerateGUID(false):sub(1, 12)
+		equipBestSnapshots[player] = {
+			token = token,
+			createdAt = os.clock(),
+			owned = ownedSwords,
+			equippedUid = oldEquipped,
+			placedMap = table.clone(oldPlacedMap),
+			pedestalSlots = pedestalSlots,
+		}
+
+		return true, "Confirmation required", {
+			needsConfirmation = true,
+			token = token,
+			leavingSwords = leavingSwords,
+			becomingActiveSwords = becomingActiveSwords,
+			netChanges = netChanges,
+		}
+	end
+
+	-- Immediate execution path: no blessed swords leaving or warning bypassed
 	if not PlayerActionLock.Acquire(player) then
-		return false, "Another inventory or pedestal action is in progress."
+		return false, "Another inventory or pedestal action is in progress.", nil
 	end
 
 	local ok, success, msg = pcall(function(): (boolean, string?)
-		local ownedSwords = DataService.Get(player, "OwnedSwords")
-		if typeof(ownedSwords) ~= "table" or #ownedSwords == 0 then
-			return true, "No swords in inventory! Roll the dice to pull swords."
-		end
-
-		local oldEquipped = DataService.Get(player, "EquippedSword")
-		if typeof(oldEquipped) ~= "string" then
-			oldEquipped = ""
-		end
-
-		local oldPlaced = DataService.Get(player, "PlacedSwords")
-		local oldPlacedMap: { [string]: string } = {}
-		if typeof(oldPlaced) == "table" then
-			for k, v in oldPlaced do
-				if typeof(k) == "string" and typeof(v) == "string" then
-					oldPlacedMap[k] = v
-				end
-			end
-		end
-
-		local maxPedestals = (GameConfig.Plot and GameConfig.Plot.MaxPedestals) or 11
-		local pedestalSlots = DataService.Get(player, "PedestalSlots") or GameConfig.Plot.DefaultPedestalsPerPlot
-		if typeof(pedestalSlots) ~= "number" then
-			pedestalSlots = 4
-		end
-		pedestalSlots = math.clamp(math.floor(pedestalSlots), 1, maxPedestals)
-
-		-- Rank swords descending
-		local ranked = rankSwords(player, ownedSwords)
-
-		-- Top sword becomes equipped
-		local targetEquippedUid = ranked[1].uid
-
-		-- Next PedestalSlots swords go to pedestals 1..PedestalSlots
-		local targetPlaced: { [string]: string } = {}
-		local placedCount = 0
-		for slot = 1, pedestalSlots do
-			local candidateIdx = 1 + slot
-			if candidateIdx <= #ranked then
-				targetPlaced[tostring(slot)] = ranked[candidateIdx].uid
-				placedCount += 1
-			end
-		end
-
-		-- Check if anything changes (skip writes if nothing changes)
-		local sameEquipped = (targetEquippedUid == oldEquipped)
-		local samePlaced = true
-		for slot = 1, maxPedestals do
-			local k = tostring(slot)
-			if (targetPlaced[k] or "") ~= (oldPlacedMap[k] or "") then
-				samePlaced = false
-				break
-			end
-		end
-		for k, _ in oldPlacedMap do
-			if not targetPlaced[k] then
-				samePlaced = false
-				break
-			end
-		end
-
-		if sameEquipped and samePlaced then
-			return true, "Best swords already equipped and placed!"
-		end
-
 		-- Atomically update EquippedSword and PlacedSwords
 		local saved = DataService.SetMany(player, {
 			EquippedSword = targetEquippedUid,
@@ -588,6 +746,8 @@ function InventoryService.EquipBest(player: Player): (boolean, string?)
 		if not saved then
 			return false, "Failed to save equipped and placed swords."
 		end
+
+		BlessingService.InvalidateCache(player)
 
 		local bestDef = swordDefMap[ranked[1].id]
 		local bestName = if bestDef then bestDef.name else "best sword"
@@ -603,7 +763,160 @@ function InventoryService.EquipBest(player: Player): (boolean, string?)
 
 	if not ok then
 		warn(("[InventoryService.EquipBest] Error for %s: %s"):format(player.Name, tostring(success)))
-		return false, "An unexpected error occurred while equipping best swords."
+		return false, "An unexpected error occurred while equipping best swords.", nil
+	end
+
+	return success, msg, { needsConfirmation = false }
+end
+
+-- Confirms and executes an Equip Best operation using the short-lived confirm token.
+-- Rejects if baseline state changed, token expired, or token invalid.
+function InventoryService.ConfirmEquipBest(player: Player, token: unknown): (boolean, string?)
+	if not checkRateLimit(player) then
+		return false, "Action rate limited. Please slow down."
+	end
+
+	if typeof(token) ~= "string" or token == "" then
+		return false, "Invalid confirmation token."
+	end
+
+	if not DataService.IsLoaded(player) then
+		return false, "Data is loading..."
+	end
+
+	if not PlayerActionLock.Acquire(player) then
+		return false, "Another inventory or pedestal action is in progress."
+	end
+
+	local ok, success, msg = pcall(function(): (boolean, string?)
+		local snap = equipBestSnapshots[player]
+		if not snap or (os.clock() - snap.createdAt) > 30 or snap.token ~= token then
+			equipBestSnapshots[player] = nil
+			return false, "Confirmation expired or invalid. Please preview again."
+		end
+
+		local currentOwned = DataService.Get(player, "OwnedSwords")
+		local currentEquipped = DataService.Get(player, "EquippedSword")
+		if typeof(currentEquipped) ~= "string" then
+			currentEquipped = ""
+		end
+		local currentPlaced = DataService.Get(player, "PlacedSwords")
+		local currentPlacedMap: { [string]: string } = {}
+		if typeof(currentPlaced) == "table" then
+			for k, v in currentPlaced do
+				if typeof(k) == "string" and typeof(v) == "string" then
+					currentPlacedMap[k] = v
+				end
+			end
+		end
+
+		local maxPedestals = (GameConfig.Plot and GameConfig.Plot.MaxPedestals) or 11
+		local rawSlots = DataService.Get(player, "PedestalSlots")
+		local currentSlots = if typeof(rawSlots) == "number" then rawSlots else ((GameConfig.Plot and GameConfig.Plot.DefaultPedestalsPerPlot) or 4)
+		currentSlots = math.clamp(math.floor(currentSlots), 1, maxPedestals)
+
+		-- Verify baseline state has NOT changed
+		local stateChanged = false
+
+		-- 1. Table reference check on OwnedSwords (catches Auto Grade / Enchant or bag modifications)
+		if not rawequal(currentOwned, snap.owned) then
+			stateChanged = true
+		end
+
+		-- 2. Equipped uid check
+		if currentEquipped ~= snap.equippedUid then
+			stateChanged = true
+		end
+
+		-- 3. Pedestal slots check
+		if currentSlots ~= snap.pedestalSlots then
+			stateChanged = true
+		end
+
+		-- 4. Placed map check
+		for k, v in snap.placedMap do
+			if (currentPlacedMap[k] or "") ~= v then
+				stateChanged = true
+				break
+			end
+		end
+		for k, v in currentPlacedMap do
+			if (snap.placedMap[k] or "") ~= v then
+				stateChanged = true
+				break
+			end
+		end
+
+		-- Single-use token consumption: clear immediately before executing
+		equipBestSnapshots[player] = nil
+
+		if stateChanged then
+			return false, "Inventory or pedestal state changed. Please preview again."
+		end
+
+		-- Re-compute target state inside lock
+		if typeof(currentOwned) ~= "table" or #currentOwned == 0 then
+			return false, "No swords in inventory!"
+		end
+
+		local ranked = rankSwords(player, currentOwned)
+		local targetEquippedUid = ranked[1].uid
+		local targetPlaced: { [string]: string } = {}
+		local placedCount = 0
+		for slot = 1, currentSlots do
+			local candidateIdx = 1 + slot
+			if candidateIdx <= #ranked then
+				targetPlaced[tostring(slot)] = ranked[candidateIdx].uid
+				placedCount += 1
+			end
+		end
+
+		local sameEquipped = (targetEquippedUid == currentEquipped)
+		local samePlaced = true
+		for slot = 1, maxPedestals do
+			local k = tostring(slot)
+			if (targetPlaced[k] or "") ~= (currentPlacedMap[k] or "") then
+				samePlaced = false
+				break
+			end
+		end
+		for k, _ in currentPlacedMap do
+			if not targetPlaced[k] then
+				samePlaced = false
+				break
+			end
+		end
+
+		if sameEquipped and samePlaced then
+			return true, "Best swords already equipped and placed!"
+		end
+
+		local saved = DataService.SetMany(player, {
+			EquippedSword = targetEquippedUid,
+			PlacedSwords = targetPlaced,
+		})
+
+		if not saved then
+			return false, "Failed to save equipped and placed swords."
+		end
+
+		BlessingService.InvalidateCache(player)
+
+		local bestDef = swordDefMap[ranked[1].id]
+		local bestName = if bestDef then bestDef.name else "best sword"
+		local reply = ("Equipped %s and filled %d pedestal%s"):format(
+			bestName,
+			placedCount,
+			if placedCount == 1 then "" else "s"
+		)
+		return true, reply
+	end)
+
+	PlayerActionLock.Release(player)
+
+	if not ok then
+		warn(("[InventoryService.ConfirmEquipBest] Error for %s: %s"):format(player.Name, tostring(success)))
+		return false, "An unexpected error occurred while confirming Equip Best."
 	end
 
 	return success, msg
@@ -656,6 +969,11 @@ function InventoryService.Start()
 		return InventoryService.EquipBest(player)
 	end
 
+	local confirmEquipBestFunc = Remotes.getFunction("ConfirmEquipBest")
+	confirmEquipBestFunc.OnServerInvoke = function(player: Player, token: unknown)
+		return InventoryService.ConfirmEquipBest(player, token)
+	end
+
 	local toggleLockFunc = Remotes.getFunction("ToggleLock")
 	toggleLockFunc.OnServerInvoke = function(player: Player, uid: unknown)
 		if typeof(uid) ~= "string" then
@@ -688,6 +1006,7 @@ function InventoryService.Start()
 	Players.PlayerRemoving:Connect(function(player)
 		playerBuckets[player] = nil
 		sellSnapshots[player] = nil
+		equipBestSnapshots[player] = nil
 	end)
 end
 

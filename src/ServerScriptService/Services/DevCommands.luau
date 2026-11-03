@@ -523,7 +523,7 @@ local function onEquipBestCommand(originTextSource: TextSource, _unfilteredText:
 		return
 	end
 
-	local ok, msg = InventoryService.EquipBest(player)
+	local ok, msg = InventoryService.EquipBest(player, true)
 	say(player, msg or (if ok then "Equip Best succeeded!" else "Equip Best failed!"))
 end
 
@@ -727,7 +727,7 @@ local function onLuckCommand(originTextSource: TextSource, _unfilteredText: stri
 	local greedMultiplier = BlessingService.GetGreedMultiplier(player)
 
 	local fortuneCap = (Blessings.Caps and Blessings.Caps.FortuneLuck) or 1.0
-	local greedCap = (Blessings.Caps and Blessings.Caps.GreedGold) or 2.0
+	local greedCap = (Blessings.Caps and Blessings.Caps.GreedGold) or 1.0
 	local gradeCap = (Blessings.Caps and Blessings.Caps.GradeLuck) or 1.0
 	local enchantCap = (Blessings.Caps and Blessings.Caps.EnchantLuck) or 1.0
 	local swiftWalkCap = (Blessings.Caps and Blessings.Caps.SwiftfootWalk) or 0.5

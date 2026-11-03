@@ -172,7 +172,7 @@ Players can spend **Gold** at the Runesmith to roll a utility **Hilt Blessing** 
 * **Stacking Rule:** Active blessings sum within a family across the equipped sword plus placed pedestal swords up to the player's current `PedestalSlots`. Each unique sword `uid` is counted at most once (strict deduplication).
 * **Caps (placeholders):** Each blessing family bonus is clamped to a maximum cap (defined in `Config/Blessings.Caps`):
   * **Fortune Luck Cap:** $+100\%$ (`FortuneLuck = 1.0`, max $+100\%$ Sword Roll Luck)
-  * **Greed Gold Cap:** $+200\%$ (`GreedGold = 2.0`, max $+200\%$ Gold earned)
+  * **Greed Gold Cap:** $+100\%$ (`GreedGold = 1.0`, max $+100\%$ Gold earned)
   * **Grade Luck Cap:** $+100\%$ (`GradeLuck = 1.0`, max $+100\%$ Grade Luck)
   * **Enchant Luck Cap:** $+100\%$ (`EnchantLuck = 1.0`, max $+100\%$ Enchant Luck)
   * **Swiftfoot WalkSpeed Cap:** $+50\%$ (`SwiftfootWalk = 0.5`, max $+50\%$ WalkSpeed, $24\text{ studs/s}$)
@@ -185,7 +185,7 @@ Players can spend **Gold** at the Runesmith to roll a utility **Hilt Blessing** 
 Each server houses 6 to 8 personal **Player Forge Plots** ringing the main plaza.
 * **Active Main Hand (Tap Income):** The player equips their #1 strongest Sword in their hand to actively tap and slash for full Gold value.
 * **Sword Pedestals (Passive & Offline Income):** Each plot starts with **4 Sword Pedestals** and has a hard cap of **11 Pedestals** (4 start, Rebirths 3, 5, 7, 9, and 10 give +1 each, VIP Forge +2). Each plot physically has **11 pedestal models**, locked until earned. Players place their backup Swords onto unlocked pedestals.
-* **Passive Payout Rate:** Every Sword placed on a Plot Pedestal radiates its Aura upward and automatically generates **50% of its Gold-Per-Tap value every second** (including Offline Gold accumulation while the player is logged out).
+* **Passive Payout Rate:** Every Sword placed on a Plot Pedestal radiates its Aura upward and automatically generates **200% of its Gold-Per-Tap value every second** (placeholder, `PassiveRateMultiplier = 2.0`; including Offline Gold accumulation while the player is logged out).
 * **Personal Plot Target Dummy:** Positioned at the front of each plot so players can slash an interactive target with damage numbers and hit-sparks right at home.
 
 ---

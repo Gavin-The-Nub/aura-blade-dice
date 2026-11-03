@@ -36,7 +36,8 @@ local FUNCTIONS: { string } = {
 	"ClaimOfflineIncome", -- client -> server: () -> { gold: number, seconds: number }?
 	"PlaceSword", -- client -> server: (slotIndex: number, swordUid: string) -> (boolean, string?)
 	"RemoveSword", -- client -> server: (slotIndex: number) -> (boolean, string?)
-	"EquipBest", -- client -> server: () -> (boolean, string?)
+	"EquipBest", -- client -> server: () -> (boolean, string?, any?)
+	"ConfirmEquipBest", -- client -> server: (token: string) -> (boolean, string?)
 	"ToggleLock", -- client -> server: (uid: string) -> (boolean, boolean?, string?)
 	"GetSellAllPreview", -- client -> server: () -> (boolean, any?, string?)
 	"SellAll", -- client -> server: (token: string) -> (boolean, number?, number?, string?)

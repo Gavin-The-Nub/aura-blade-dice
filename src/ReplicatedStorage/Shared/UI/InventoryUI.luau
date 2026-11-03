@@ -51,6 +51,7 @@ export type InventoryUIInstance = {
 	ShowEquipBestMessage: (self: InventoryUIInstance, message: string, isSuccess: boolean?) -> (),
 	ShowFeedback: (self: InventoryUIInstance, message: string, isSuccess: boolean?) -> (),
 	OpenAutoSell: (self: InventoryUIInstance) -> (),
+	SetOnClose: (self: InventoryUIInstance, callback: () -> ()) -> (),
 	Destroy: (self: InventoryUIInstance) -> (),
 }
 
@@ -78,6 +79,9 @@ function InventoryUI.new(parentGui: Instance): InventoryUIInstance
 		ownsScreenGui = true
 	end
 
+	-- Forward reference for close callback
+	local onCloseCallback: (() -> ())? = nil
+
 	-- Main Inventory Modal
 	local popup = Popup.new({
 		Title = "Swords & Inventory",
@@ -85,6 +89,11 @@ function InventoryUI.new(parentGui: Instance): InventoryUIInstance
 		MaxWidth = 680,
 		MaxHeight = 520,
 		Parent = screenGui,
+		OnClose = function()
+			if onCloseCallback then
+				onCloseCallback()
+			end
+		end,
 	})
 
 	local rootContent = popup.Content
@@ -1014,6 +1023,9 @@ function InventoryUI.new(parentGui: Instance): InventoryUIInstance
 		Close = function(_)
 			popup:Close()
 			sellConfirmPopup:Close()
+			if onCloseCallback then
+				onCloseCallback()
+			end
 		end,
 		SetData = function(_, ownedSwords: { OwnedSwordEntry }, equippedUid: string, autoSellRules: { [string]: boolean }, placedSwords: { [string]: string }?)
 			currentOwnedSwords = ownedSwords or {}
@@ -1068,6 +1080,9 @@ function InventoryUI.new(parentGui: Instance): InventoryUIInstance
 		end,
 		OpenAutoSell = function(this)
 			this:Open()
+		end,
+		SetOnClose = function(_, callback: () -> ())
+			onCloseCallback = callback
 		end,
 		Destroy = function(_)
 			if feedbackTimer then

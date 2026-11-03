@@ -70,31 +70,13 @@ function BlessingService.InvalidateCache(player: Player)
 	end
 end
 
--- Returns the full breakdown of aggregated raw and capped luck/gold/swiftfoot bonuses and contributing sources
-function BlessingService.GetBonuses(player: Player, dataServiceOverride: any?): BlessingBonuses
-	if player == nil then
-		return ZERO_BONUSES
-	end
-	if typeof(player) == "Instance" and player.Parent ~= Players then
-		return ZERO_BONUSES
-	end
-
-	-- Fast-path cached lookup when not in test-override mode
-	if dataServiceOverride == nil then
-		local cached = cachedBonuses[player]
-		if cached ~= nil then
-			return cached
-		end
-	end
-
-	local ds = dataServiceOverride or DataService
-
-	-- NEVER cache when data is not loaded, and NEVER cache ZERO_BONUSES
-	if not ds.IsLoaded(player) then
-		return ZERO_BONUSES
-	end
-
-	local owned = ds.Get(player, "OwnedSwords")
+-- Pure function computing BlessingBonuses from given inventory and slot assignment state
+function BlessingService.ComputeBonuses(
+	owned: { any }?,
+	equippedUid: string?,
+	placed: { [string]: string }?,
+	rawSlots: number?
+): BlessingBonuses
 	if typeof(owned) ~= "table" then
 		return ZERO_BONUSES
 	end
@@ -107,13 +89,10 @@ function BlessingService.GetBonuses(player: Player, dataServiceOverride: any?): 
 		end
 	end
 
-	local equippedUid = ds.Get(player, "EquippedSword")
-	local placed = ds.Get(player, "PlacedSwords")
 	local placedMap = if typeof(placed) == "table" then placed else {}
 
 	local defaultSlots = (GameConfig.Plot and GameConfig.Plot.DefaultPedestalsPerPlot) or 4
 	local maxSlots = (GameConfig.Plot and GameConfig.Plot.MaxPedestals) or 11
-	local rawSlots = ds.Get(player, "PedestalSlots")
 	local activeSlots = math.clamp(
 		if typeof(rawSlots) == "number" then rawSlots else defaultSlots,
 		1,
@@ -182,18 +161,18 @@ function BlessingService.GetBonuses(player: Player, dataServiceOverride: any?): 
 		FortuneLuck = 1.0,
 		GradeLuck = 1.0,
 		EnchantLuck = 1.0,
-		GreedGold = 2.0,
+		GreedGold = 1.0,
 		SwiftfootWalk = 0.5,
 		SwiftfootAutoTap = 0.5,
 	}
 	local fortuneCap = caps.FortuneLuck or 1.0
-	local greedCap = caps.GreedGold or 2.0
+	local greedCap = caps.GreedGold or 1.0
 	local gradeCap = caps.GradeLuck or 1.0
 	local enchantCap = caps.EnchantLuck or 1.0
 	local swiftWalkCap = caps.SwiftfootWalk or 0.5
 	local swiftTapCap = caps.SwiftfootAutoTap or 0.5
 
-	local result: BlessingBonuses = table.freeze({
+	return table.freeze({
 		fortuneRaw = rawFortune,
 		fortuneCapped = math.min(rawFortune, fortuneCap),
 		greedRaw = rawGreed,
@@ -208,6 +187,38 @@ function BlessingService.GetBonuses(player: Player, dataServiceOverride: any?): 
 		swiftTapCapped = math.min(rawSwiftTap, swiftTapCap),
 		sources = table.freeze(sources),
 	})
+end
+
+-- Returns the full breakdown of aggregated raw and capped luck/gold/swiftfoot bonuses and contributing sources
+function BlessingService.GetBonuses(player: Player, dataServiceOverride: any?): BlessingBonuses
+	if player == nil then
+		return ZERO_BONUSES
+	end
+	if typeof(player) == "Instance" and player.Parent ~= Players then
+		return ZERO_BONUSES
+	end
+
+	-- Fast-path cached lookup when not in test-override mode
+	if dataServiceOverride == nil then
+		local cached = cachedBonuses[player]
+		if cached ~= nil then
+			return cached
+		end
+	end
+
+	local ds = dataServiceOverride or DataService
+
+	-- NEVER cache when data is not loaded, and NEVER cache ZERO_BONUSES
+	if not ds.IsLoaded(player) then
+		return ZERO_BONUSES
+	end
+
+	local owned = ds.Get(player, "OwnedSwords")
+	local equippedUid = ds.Get(player, "EquippedSword")
+	local placed = ds.Get(player, "PlacedSwords")
+	local rawSlots = ds.Get(player, "PedestalSlots")
+
+	local result = BlessingService.ComputeBonuses(owned, equippedUid, placed, rawSlots)
 
 	if dataServiceOverride == nil then
 		cachedBonuses[player] = result

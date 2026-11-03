@@ -12,6 +12,7 @@ local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Remotes = require(Shared:WaitForChild("Remotes"))
 local UI = Shared:WaitForChild("UI")
 local InventoryUI = require(UI:WaitForChild("InventoryUI"))
+local EquipBestWarningPopup = require(UI:WaitForChild("EquipBestWarningPopup"))
 
 local InventoryController = {}
 
@@ -110,6 +111,14 @@ function InventoryController.Init()
 		end)
 	end)
 
+	local warningPopupInstance = EquipBestWarningPopup.new(playerGui)
+
+	uiInstance:SetOnClose(function()
+		if warningPopupInstance then
+			warningPopupInstance:Close()
+		end
+	end)
+
 	uiInstance:SetOnToggleAutoSell(function(rarity: string, enabled: boolean)
 		autoSellRules[rarity] = enabled
 		refreshUI()
@@ -122,16 +131,51 @@ function InventoryController.Init()
 			if not uiInstance then return end
 			uiInstance:SetEquipBestBusy(true)
 			local equipBestFunc = Remotes.getFunction("EquipBest")
-			local ok, success, msg = pcall(function()
+			local ok, success, msg, data = pcall(function()
 				return equipBestFunc:InvokeServer()
 			end)
-			if uiInstance then
-				uiInstance:SetEquipBestBusy(false)
-				if ok then
-					uiInstance:ShowEquipBestMessage(tostring(msg or (if success then "Equipped best swords!" else "Failed to equip")), success)
-				else
-					uiInstance:ShowEquipBestMessage("Request failed: " .. tostring(msg or "network error"), false)
-				end
+
+			if not uiInstance then return end
+			uiInstance:SetEquipBestBusy(false)
+
+			if not ok then
+				uiInstance:ShowEquipBestMessage("Request failed: " .. tostring(msg or "network error"), false)
+				return
+			end
+
+			if not success then
+				uiInstance:ShowEquipBestMessage(tostring(msg or "Failed to equip best swords"), false)
+				return
+			end
+
+			-- Check if preview requires confirmation
+			if type(data) == "table" and data.needsConfirmation == true and data.token and warningPopupInstance then
+				warningPopupInstance:Show(data, function(token: string)
+					task.spawn(function()
+						if not warningPopupInstance then return end
+						warningPopupInstance:SetBusy(true)
+						local confirmFunc = Remotes.getFunction("ConfirmEquipBest")
+						local confirmOk, confirmSuccess, confirmMsg = pcall(function()
+							return confirmFunc:InvokeServer(token)
+						end)
+
+						if warningPopupInstance then
+							warningPopupInstance:SetBusy(false)
+							warningPopupInstance:Close()
+						end
+
+						if uiInstance then
+							if confirmOk then
+								uiInstance:ShowEquipBestMessage(tostring(confirmMsg or (if confirmSuccess then "Equipped best swords!" else "Failed to equip")), confirmSuccess)
+							else
+								uiInstance:ShowEquipBestMessage("Confirm failed: " .. tostring(confirmMsg or "network error"), false)
+							end
+						end
+					end)
+				end)
+			else
+				-- Immediate execution path
+				uiInstance:ShowEquipBestMessage(tostring(msg or "Equipped best swords!"), true)
 			end
 		end)
 	end)
