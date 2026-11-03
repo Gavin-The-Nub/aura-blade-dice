@@ -65,21 +65,21 @@ If you want to change this structure, ask me first.
 ## 6. Game math (from the GDD, implement exactly)
 
 - **Luck Formulas:**
-  - **Sword Roll Luck:** `Total Sword Luck = Dice Base Luck × Rebirth Luck × Enchant passive Luck (data only, not applied yet) × Fever (1.5×) × (1 + Fortune Blessing Bonus) × Potion/Server boosts`
+  - **Sword Roll Luck:** `Total Sword Luck = Dice Base Luck × Rebirth Luck (stays 1.0 for now) × Enchant passive Luck (data only, not applied yet) × Fever (1.5×) × (1 + Fortune Blessing Bonus) × Potion/Server boosts`
   - **Grade Roll Luck:** `Total Grade Luck = 1.0 + Appraiser's Eye Blessing Bonus` (rolled at Master Appraiser)
   - **Enchant Roll Luck:** `Total Enchant Luck = 1.0 + Enchanter's Soul Blessing Bonus` (rolled at Enchanter)
   - **Blessings.Caps:** Defined in `Config/Blessings.Caps` (placeholders: `FortuneLuck = 1.0` (+100%), `GradeLuck = 1.0` (+100%), `EnchantLuck = 1.0` (+100%), `GreedGold = 1.0` (+100%), `SwiftfootWalk = 0.5` (+50%), `SwiftfootAutoTap = 0.5` (+50%)). Active blessings sum within a family across the equipped sword plus placed pedestal swords up to player's `PedestalSlots` (each unique sword uid counted once), then clamp to the cap.
 - **Swiftfoot Blessing:** WalkSpeed is set server-side (`BaseWalkSpeed × (1 + SwiftfootWalkBonus)` with `Config/Game.Player.BaseWalkSpeed = 16`, capped at +50% / 24 studs/s) on CharacterAdded, respawn, and on blessing changes. Auto-Tap rate is driven by a frame-based accumulator (`BaseTapsPerSecond × (1 + SwiftfootAutoTapBonus) × feverSpeed` with `BaseTapsPerSecond = 10`, capped at +50% / 15 taps/s, or 30 taps/s during Fever); `TapService.getMaxTapRate` and the token bucket scale by the exact same multiplier, and manual taps share this rate allowance.
 - **Roll odds & Cooldown:** `Effective Odds = max(1, Sword Base Odds / Total Luck)`. Roll cooldown is **global** (`Config/Game.Roll.Cooldown`, baseline 3.0s placeholder), not per Dice.
 - **Dice Ladder:** 29-tier progression table (Basic Dice up to Zenith Dice). Players can purchase any tier with Gold in any order and switch/equip any owned Dice tier at will.
-- **Gold per tap:** `Base Damage × Grade × Enchant × Rebirth × Crit × (1 + Greed)` (Greed multiplies Gold from taps, Auto-Tap, passive pedestal income, and offline income; it excludes sword sale price, Gems, Tokens, and Trial rewards).
+- **Gold per tap:** `Base Damage × Grade × Enchant × Rebirth Multiplier × Crit × (1 + Greed)` (Rebirth multiplier scales Gold from taps, Auto-Tap, passive pedestal income, and offline income; it excludes sword sale price, Gems, Tokens, and Trial rewards).
 - **Crit:** 10% base chance, 2.5× Gold.
 - **Fever:** each tap adds 1 point to a 100-point meter. At 100 it triggers a 15-second mode with 2× swing speed, 100% crit, and +50% Luck.
 - **Pedestal passive income:** each pedestal Sword gives 200% of its Gold-per-tap value every second (`Config/Game.Plot.PassiveRateMultiplier = 2.0` placeholder), including offline time (capped at 8 hours). Hard cap of **11 pedestals** per plot (4 starting, +1 each at Rebirths 3, 5, 7, 9, and 10, and +2 from VIP Forge). Each plot physically has 11 pedestal models, locked until earned.
 - **Grades & Auto Grade Roll:** Rolled with Gems at Master Appraiser (near Trials), costing **1 Gem per roll**. A roll replaces the sword's Grade (one Grade per sword). Free **Auto Grade Roll**: player picks a target Grade; server rolls until result is target or better, Gems run out, or player stops; never starts if sword already has target or better.
 - **Selling & Lock:** Single sell and Sell All **never touch equipped or placed swords**. Every other sword sells unless the player locked it. Sword **Lock** is a boolean flag on each sword toggled in the inventory, preventing single sell and causing Sell All to skip it. Sell All confirmation dialog shows sword count and total Gold payout, and warns how many of those swords have a Grade or Enchant.
 - **Equip Best & Blessings:** Equip Best ranks by Greed-free Gold per tap; if replacing equipped or pedestal swords would unequip or unplace any blessed sword, the server returns a 30s single-use confirmation token with a preview of leaving swords and net blessing changes.
-- **Rebirth:** Rebirth resets **Gold only**. Dice (`DiceTier` and `OwnedDice`), swords, Gems, Tokens, Potions, and pedestal slots are **permanently kept**. Rebirth multipliers and costs are marked *to be verified against Anime Dice* until confirmed. Old text saying Rebirth resets Dice is obsolete and removed.
+- **Rebirth:** Rebirth resets **Gold only**. Dice (`DiceTier` and `OwnedDice`), swords, Gems, Tokens, Potions, and pedestal slots are **permanently kept**. Rebirth scaling numbers (costs, multipliers, gems, slots) in `Config/Rebirths.luau` are placeholders until verified against Anime Dice data. Rebirth Luck stays 1.0 for now.
 
 When the GDD has a table, copy it into the matching Config module faithfully.
 
@@ -108,7 +108,6 @@ Costs reach Septillion scale. Use normal Luau numbers (doubles). Always display 
 ## 10. Known open issues
 
 - **Dual Wielding:** Needs two equipped swords, but the codebase and player data model currently assume a single `EquippedSword`.
-- **Rebirth Multipliers & Costs:** Multipliers and Gold costs in Config and GDD are unverified placeholders until confirmed against Anime Dice.
 - **Sword List Content:** The sword list in `Config/Swords` is too short for the high-Luck dice (players with top-tier dice will roll beyond the highest-rarity swords currently defined).
 - **Sword Grade & Enchant Field Names & Multipliers:** Grade and Enchant fields on sword data entries are named lowercase `grade` and `enchant` (strings), read by `InventoryService.GetSellAllPreview` and `SellStallUI` for warnings. `TapService.CalculateSwordGoldPerTap` and `PlotService.refreshPedestals` read the grade multiplier from `Config/Grades` and the enchant Gold multiplier from `Config/Enchants`. **Note on SalePrice:** `Shared/SalePrice.luau` intentionally calculates sword sale prices based on base damage only (grade and enchant multipliers are disabled / set to 1.0) to avoid an unintended Gem/Token-to-Gold loop until full economy tuning is complete.
 - **Enchant Tokens In-Game Source:** `EnchantTokens` currency has no real gameplay source until Trials and Golden Rush central arena events are implemented; currently testing uses the Studio `/tokens` dev command.

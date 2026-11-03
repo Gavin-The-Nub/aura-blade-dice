@@ -31,6 +31,7 @@ The following commands are implemented in `src/ServerScriptService/Services/DevC
 - [ ] **/blessingtest `<n>`**: Simulates n rolls (capped at 100,000) against Config/Blessings with 0 Gold cost and prints distribution and percentage vs expected odds to Output.
 - [ ] **/luck**: Prints player's aggregated Fortune, Grade, and Enchant blessing bonuses (raw & capped), contributing sword sources, and effective odds for the rarest 3 swords, Grades, and Enchants.
 - [ ] **/goldcredittest**: Verifies real server-side GoldCredit.Credit remainder carry math, odd-base crits, failure rollback, and invariants across 1,000 taps and passive ticks.
+- [ ] **/rebirthtest [n]**: Studio-only test command that prints the 1-15 Rebirth scaling table with EconSim Auto GPS pacing (no args) or sets player's Rebirths and milestone PedestalSlots directly to n (0-15, no Gems granted).
 
 > **Production Safeguard:** Verify that `DevCommands.luau` and `ServerScriptService/EconSim.luau` include Studio-only gating or are removed before production builds.
 

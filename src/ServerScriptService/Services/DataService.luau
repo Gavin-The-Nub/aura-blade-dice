@@ -15,6 +15,7 @@ local ServerScriptService = game:GetService("ServerScriptService")
 local DataTemplate = require(ReplicatedStorage.Config.DataTemplate)
 local GameConfig = require(ReplicatedStorage.Config.Game)
 local Dice = require(ReplicatedStorage.Config.Dice)
+local Rebirths = require(ReplicatedStorage.Config.Rebirths)
 local Remotes = require(ReplicatedStorage.Shared.Remotes)
 local ProfileStore = require(ServerScriptService.Vendor.ProfileStore) :: any
 
@@ -129,6 +130,15 @@ local function onPlayerAdded(player: Player)
 		profile.Data.EnchantTokens = math.floor(profile.Data.EnchantTokens)
 	end
 
+	-- Validate and clamp Rebirths to safe integer in [0, Rebirths.MaxRebirths]
+	if type(profile.Data.Rebirths) ~= "number" or profile.Data.Rebirths < 0 then
+		profile.Data.Rebirths = 0
+	elseif profile.Data.Rebirths > Rebirths.MaxRebirths then
+		profile.Data.Rebirths = Rebirths.MaxRebirths
+	else
+		profile.Data.Rebirths = math.floor(profile.Data.Rebirths)
+	end
+
 	-- Validate and clamp DiceTier between 1 and #Dice (preserving valid owned/equipped tiers)
 	local equipped = profile.Data.DiceTier
 	if type(equipped) ~= "number" or equipped < 1 then
@@ -201,13 +211,13 @@ local function onPlayerAdded(player: Player)
 		end
 	end
 
-	-- Migrate PedestalSlots: default to GameConfig.Plot.DefaultPedestalsPerPlot, clamp to MaxPedestals
+	-- Migrate PedestalSlots: heal with Rebirths milestones, clamp to MaxPedestals, never lower slots
 	local maxPedestals = (GameConfig.Plot and GameConfig.Plot.MaxPedestals) or 11
-	if type(profile.Data.PedestalSlots) ~= "number" or profile.Data.PedestalSlots < 1 then
-		profile.Data.PedestalSlots = GameConfig.Plot.DefaultPedestalsPerPlot
-	elseif profile.Data.PedestalSlots > maxPedestals then
-		profile.Data.PedestalSlots = maxPedestals
-	end
+	local currentSlots = if type(profile.Data.PedestalSlots) == "number" and profile.Data.PedestalSlots >= 1
+		then profile.Data.PedestalSlots
+		else GameConfig.Plot.DefaultPedestalsPerPlot
+	local rebirthSlots = Rebirths.GetPedestalSlots(profile.Data.Rebirths or 0)
+	profile.Data.PedestalSlots = math.clamp(math.max(currentSlots, rebirthSlots), 1, maxPedestals)
 	local maxPedestalSlots = profile.Data.PedestalSlots
 
 	-- Migrate PlacedSwords:
@@ -381,6 +391,11 @@ function DataService.Set(player: Player, key: string, value: any): boolean
 				return false
 			end
 		end
+		if key == "Rebirths" then
+			if value < 0 or value > Rebirths.MaxRebirths or value ~= math.floor(value) then
+				return false
+			end
+		end
 	end
 	profile.Data[key] = value
 	changedEvent:Fire(player, key, value)
@@ -394,6 +409,29 @@ function DataService.Set(player: Player, key: string, value: any): boolean
 			end
 		end)
 	end
+
+	-- Heal PedestalSlots on Rebirths change: max(PedestalSlots, Rebirths.GetPedestalSlots(Rebirths)), clamped to MaxPedestals
+	if key == "Rebirths" then
+		local maxPedestals = (GameConfig.Plot and GameConfig.Plot.MaxPedestals) or 11
+		local currentSlots = profile.Data.PedestalSlots or GameConfig.Plot.DefaultPedestalsPerPlot
+		local milestoneSlots = Rebirths.GetPedestalSlots(value)
+		local healedSlots = math.clamp(math.max(currentSlots, milestoneSlots), 1, maxPedestals)
+		if healedSlots > currentSlots then
+			profile.Data.PedestalSlots = healedSlots
+			changedEvent:Fire(player, "PedestalSlots", healedSlots)
+			if player.Parent == Players then
+				task.spawn(function()
+					local ok, event = pcall(function()
+						return Remotes.getEvent("DataChanged")
+					end)
+					if ok and event then
+						event:FireClient(player, "PedestalSlots", healedSlots)
+					end
+				end)
+			end
+		end
+	end
+
 	return true
 end
 
@@ -436,9 +474,28 @@ function DataService.SetMany(player: Player, updates: { [string]: any }): boolea
 					return false
 				end
 			end
+			if key == "Rebirths" then
+				if value < 0 or value > Rebirths.MaxRebirths or value ~= math.floor(value) then
+					return false
+				end
+			end
 		end
 		sanitized[key] = value
 		oldValues[key] = profile.Data[key]
+	end
+
+	-- Heal PedestalSlots on Rebirths changes: max(PedestalSlots, Rebirths.GetPedestalSlots(Rebirths)), clamped to MaxPedestals
+	if sanitized.Rebirths ~= nil then
+		local maxPedestals = (GameConfig.Plot and GameConfig.Plot.MaxPedestals) or 11
+		local currentSlots = sanitized.PedestalSlots or profile.Data.PedestalSlots or GameConfig.Plot.DefaultPedestalsPerPlot
+		local milestoneSlots = Rebirths.GetPedestalSlots(sanitized.Rebirths)
+		local healedSlots = math.clamp(math.max(currentSlots, milestoneSlots), 1, maxPedestals)
+		if healedSlots > (sanitized.PedestalSlots or profile.Data.PedestalSlots or 0) then
+			sanitized.PedestalSlots = healedSlots
+			if oldValues["PedestalSlots"] == nil then
+				oldValues["PedestalSlots"] = profile.Data.PedestalSlots
+			end
+		end
 	end
 
 	-- Synchronous write without yields, with rollback safeguard
@@ -486,6 +543,16 @@ function DataService.Increment(player: Player, key: string, amount: number): boo
 		return false
 	end
 	return DataService.Set(player, key, current + amount)
+end
+
+-- Studio-only test helper to write raw data directly to profile without healing
+function DataService._SetRawForTesting(player: Player, key: string, value: any)
+	if RunService:IsStudio() then
+		local profile = profiles[player]
+		if profile then
+			profile.Data[key] = value
+		end
+	end
 end
 
 return DataService

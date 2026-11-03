@@ -49,6 +49,8 @@ local FUNCTIONS: { string } = {
 	"StopAutoEnchant", -- client -> server: () -> (boolean, string?)
 	"RollBlessing", -- client -> server: (uid: string) -> (boolean, string?, string?, number?, string?)
 	"GetBlessingCost", -- client -> server: () -> number
+	"GetRebirthPreview", -- client -> server: () -> (boolean, any?, string?)
+	"ConfirmRebirth", -- client -> server: (token: string) -> (boolean, any?, string?)
 }
 
 local Remotes = {}

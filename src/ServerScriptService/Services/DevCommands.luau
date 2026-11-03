@@ -26,7 +26,7 @@ local NumberFormat = require(ReplicatedStorage.Shared.NumberFormat)
 local Remotes = require(ReplicatedStorage.Shared.Remotes)
 local GameConfig = require(ReplicatedStorage.Config.Game)
 local EconSim = require(ServerScriptService.EconSim)
-local GoldCredit = require(ServerScriptService.GoldCredit)
+local Rebirths = require(ReplicatedStorage.Config.Rebirths)
 local GoldCredit = require(ServerScriptService.GoldCredit)
 
 local DevCommands = {}
@@ -474,6 +474,110 @@ function DevCommands.SetPedSlots(player: Player, slots: number): (boolean, strin
 	end
 end
 
+local function handleRebirthTest(player: Player, arg: string?): (boolean, string)
+	if not RunService:IsStudio() then
+		local msg = "[DevCommands] /rebirthtest is Studio-only."
+		say(player, msg)
+		return false, msg
+	end
+
+	if arg and arg ~= "" then
+		local n = tonumber(arg)
+		if not n or n ~= math.floor(n) or n < 0 or n > Rebirths.MaxRebirths then
+			local msg = string.format("Usage: /rebirthtest <0-%d>", Rebirths.MaxRebirths)
+			say(player, msg)
+			return false, msg
+		end
+
+		local targetSlots = Rebirths.GetPedestalSlots(n)
+		local currentSlots = DataService.Get(player, "PedestalSlots") or Rebirths.BasePedestalSlots
+		local newSlots = math.max(currentSlots, targetSlots)
+
+		local ok = DataService.SetMany(player, {
+			Rebirths = n,
+			PedestalSlots = newSlots,
+		})
+
+		if ok then
+			local msg = string.format("Rebirths set to %d, PedestalSlots set to %d (No Gems granted)", n, newSlots)
+			say(player, msg)
+			return true, msg
+		else
+			local msg = "Failed to update Rebirths/PedestalSlots."
+			say(player, msg)
+			return false, msg
+		end
+	else
+		-- Print 1-15 table:
+		-- cost, multiplier, income gain vs previous rebirth (ratio), and cost divided by (Auto GPS x GetGoldMultiplier(n-1)) as hours
+		local gps6 = EconSim.GetTierAutoTapGps(6)
+		local gps9 = EconSim.GetTierAutoTapGps(9)
+		local gps12 = EconSim.GetTierAutoTapGps(12)
+
+		print(string.rep("=", 120))
+		print("  [REBIRTH SCALING TABLE (1-15)]  (PLACEHOLDER)")
+		print(string.format("  Reference EconSim Auto GPS: T6=%s (%d/s), T9=%s (%d/s), T12=%s (%d/s)",
+			NumberFormat.format(gps6), gps6,
+			NumberFormat.format(gps9), gps9,
+			NumberFormat.format(gps12), gps12))
+		print(string.rep("-", 120))
+		print(string.format(
+			"%-4s | %-12s | %-6s | %-12s | %-8s | %-8s | %-10s | %-10s | %-10s",
+			"Tier", "Gold Cost", "Mult", "Income Gain", "Gems", "Slots", "Hours(T6)", "Hours(T9)", "Hours(T12)"
+		))
+		print(string.rep("-", 120))
+
+		for i = 1, Rebirths.MaxRebirths do
+			local cost = Rebirths.GetCost(i)
+			local mult = Rebirths.GetGoldMultiplier(i)
+			local prevMult = Rebirths.GetGoldMultiplier(i - 1)
+			local incomeGainRatio = if prevMult > 0 then mult / prevMult else mult
+			local gems = Rebirths.GetGemsGrant(i)
+			local slots = Rebirths.GetPedestalSlots(i)
+
+			local effGps6 = gps6 * prevMult
+			local effGps9 = gps9 * prevMult
+			local effGps12 = gps12 * prevMult
+
+			local h6 = if effGps6 > 0 then (cost / effGps6) / 3600 else 0
+			local h9 = if effGps9 > 0 then (cost / effGps9) / 3600 else 0
+			local h12 = if effGps12 > 0 then (cost / effGps12) / 3600 else 0
+
+			print(string.format(
+				"%-4d | %-12s | %-6s | %-12s | %-8s | %-8d | %-10.2f | %-10.2f | %-10.2f",
+				i,
+				NumberFormat.format(cost),
+				string.format("%.1fx", mult),
+				string.format("%.2fx", incomeGainRatio),
+				string.format("+%d", gems),
+				slots,
+				h6,
+				h9,
+				h12
+			))
+		end
+		print(string.rep("=", 120))
+
+		local msg = string.format("Printed Rebirth 1-%d table to Output (T6 GPS: %s, T9 GPS: %s, T12 GPS: %s)",
+			Rebirths.MaxRebirths,
+			NumberFormat.format(gps6),
+			NumberFormat.format(gps9),
+			NumberFormat.format(gps12))
+		say(player, msg)
+		return true, msg
+	end
+end
+
+local function onRebirthTestCommand(originTextSource: TextSource, unfilteredText: string)
+	local player = Players:GetPlayerByUserId(originTextSource.UserId)
+	if player == nil then
+		return
+	end
+
+	local arg = unfilteredText:match("^%S+%s+(%S+)")
+	handleRebirthTest(player, arg)
+end
+
 local function onPedSlotsCommand(originTextSource: TextSource, unfilteredText: string)
 	local player = Players:GetPlayerByUserId(originTextSource.UserId)
 	if player == nil then
@@ -481,10 +585,12 @@ local function onPedSlotsCommand(originTextSource: TextSource, unfilteredText: s
 	end
 
 	local maxPedestals = (GameConfig.Plot and GameConfig.Plot.MaxPedestals) or 11
+	local defaultSlots = (GameConfig.Plot and GameConfig.Plot.DefaultPedestalsPerPlot) or 4
 	local arg = unfilteredText:match("^%S+%s+(%S+)")
 	local slots = tonumber(arg)
 	if arg == nil or slots == nil then
-		say(player, ("Usage: /pedslots <1-%d>"):format(maxPedestals))
+		local cur = DataService.Get(player, "PedestalSlots") or defaultSlots
+		say(player, ("Current PedestalSlots: %d (Max: %d)"):format(cur, maxPedestals))
 		return
 	end
 
@@ -898,7 +1004,8 @@ local function onLuckCommand(originTextSource: TextSource, _unfilteredText: stri
 	end
 	print("================================================================================")
 
-	say(player, ("[Luck] Fortune: +%.1f%% | Greed: +%.1f%% (x%.2f) | Grade: +%.1f%% | Enchant: +%.1f%% | SwiftWalk: +%.1f%% (%.1f spd) | SwiftTap: +%.1f%% (%.1f taps/s) | GPT: %.2f | Passive: %.2f/s"):format(
+	say(player, ("[Luck] Slots: %d | Fortune: +%.1f%% | Greed: +%.1f%% (x%.2f) | Grade: +%.1f%% | Enchant: +%.1f%% | SwiftWalk: +%.1f%% (%.1f spd) | SwiftTap: +%.1f%% (%.1f taps/s) | GPT: %.2f | Passive: %.2f/s"):format(
+		pedestalSlots,
 		bonuses.fortuneCapped * 100,
 		bonuses.greedCapped * 100,
 		greedMultiplier,
@@ -1228,6 +1335,12 @@ function DevCommands.Start()
 	goldCreditTestCommand.PrimaryAlias = "/goldcredittest"
 	goldCreditTestCommand.Triggered:Connect(onGoldCreditTestCommand)
 	goldCreditTestCommand.Parent = TextChatService
+
+	local rebirthTestCommand = Instance.new("TextChatCommand")
+	rebirthTestCommand.Name = "DevRebirthTestCommand"
+	rebirthTestCommand.PrimaryAlias = "/rebirthtest"
+	rebirthTestCommand.Triggered:Connect(onRebirthTestCommand)
+	rebirthTestCommand.Parent = TextChatService
 
 end
 

@@ -924,4 +924,57 @@ function EconSim.Run(
 	return finalReport
 end
 
+-- Studio helper to get autoTapGps for a given Dice tier without printing the full simulation report
+function EconSim.GetTierAutoTapGps(targetTier: number): number
+	local standardPool: { SimulationSword } = {}
+	for _, s in Swords do
+		if not s.isTest then
+			table.insert(standardPool, {
+				id = s.id,
+				name = s.name,
+				rarity = s.rarity,
+				baseOdds = s.baseOdds,
+				baseDamage = s.baseDamage,
+				isHypothetical = false,
+			})
+		end
+	end
+
+	table.sort(standardPool, function(a, b)
+		return a.baseOdds > b.baseOdds
+	end)
+
+	local diceDef = Dice[targetTier]
+	if not diceDef then
+		return 0
+	end
+
+	local luck = diceDef.baseLuck
+	local swordResults, _ = calculateTierRolls(standardPool, luck)
+
+	local valid500: { { sword: SimulationSword, expectedRolls: number } } = {}
+	for _, res in swordResults do
+		if res.expectedRolls <= 500 then
+			table.insert(valid500, res)
+		end
+	end
+
+	table.sort(valid500, function(a, b)
+		return a.sword.baseDamage > b.sword.baseDamage
+	end)
+
+	local bestSword = if #valid500 > 0 then valid500[1].sword else swordResults[#swordResults].sword
+	local pedDamageSum = 0
+	for i = 2, math.min(5, #valid500) do
+		pedDamageSum += valid500[i].sword.baseDamage
+	end
+
+	local baseTapsSec = (GameConfig.AutoTap and GameConfig.AutoTap.BaseTapsPerSecond) or 10
+	local passiveRate = (GameConfig.Plot and GameConfig.Plot.PassiveRateMultiplier) or 2.0
+	local tapPortion = bestSword.baseDamage * baseTapsSec
+	local autoTapGps = tapPortion + (pedDamageSum * passiveRate)
+
+	return autoTapGps
+end
+
 return EconSim

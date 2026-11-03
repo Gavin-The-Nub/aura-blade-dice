@@ -11,6 +11,7 @@ local GameConfig = require(ReplicatedStorage.Config.Game)
 local Swords = require(ReplicatedStorage.Config.Swords)
 local Grades = require(ReplicatedStorage.Config.Grades)
 local Enchants = require(ReplicatedStorage.Config.Enchants)
+local Rebirths = require(ReplicatedStorage.Config.Rebirths)
 local Remotes = require(ReplicatedStorage.Shared.Remotes)
 local DataService = require(ServerScriptService.Services.DataService)
 local BlessingService = require(ServerScriptService.BlessingService)
@@ -73,7 +74,13 @@ function TapService.CalculateSwordGoldPerTap(player: Player, swordEntry: any): n
 	if type(swordEntry) == "table" and type(swordEntry.enchant) == "string" then
 		enchantMult = Enchants.GetMultiplier(swordEntry.enchant)
 	end
-	local rebirthMult = 1
+	local rebirthMult = 1.0
+	if player and DataService.IsLoaded(player) then
+		local rebirths = DataService.Get(player, "Rebirths")
+		if type(rebirths) == "number" and rebirths > 0 then
+			rebirthMult = Rebirths.GetGoldMultiplier(rebirths)
+		end
+	end
 
 	return baseDamage * gradeMult * enchantMult * rebirthMult
 end
@@ -436,7 +443,7 @@ function TapService.Start()
 	end
 
 	DataService.Changed:Connect(function(player: Player, key: string, _value: any)
-		if key == "EquippedSword" or key == "OwnedSwords" or key == "PlacedSwords" or key == "PedestalSlots" then
+		if key == "EquippedSword" or key == "OwnedSwords" or key == "PlacedSwords" or key == "PedestalSlots" or key == "Rebirths" then
 			updateEquippedDamageCache(player)
 		end
 	end)

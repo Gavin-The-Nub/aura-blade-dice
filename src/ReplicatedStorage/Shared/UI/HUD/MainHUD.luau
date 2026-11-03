@@ -33,6 +33,7 @@ export type MainHUDInstance = {
 	SetOnAutoRollToggle: (self: MainHUDInstance, callback: () -> ()) -> (),
 	SetOnBackpack: (self: MainHUDInstance, callback: () -> ()) -> (),
 	SetOnDice: (self: MainHUDInstance, callback: () -> ()) -> (),
+	SetOnRebirth: (self: MainHUDInstance, callback: () -> ()) -> (),
 	ShowRollPopup: (self: MainHUDInstance, swordDef: any, isAutoSold: boolean?) -> (),
 	ShowRollToast: (self: MainHUDInstance, swordOrText: any, isError: boolean?, isAutoSold: boolean?) -> (),
 	SpawnFloatingNumber: (self: MainHUDInstance, pos: Vector2, amount: number, isCrit: boolean) -> (),
@@ -382,7 +383,6 @@ function MainHUD.new(parentGui: Instance): MainHUDInstance
 	end
 
 	local shopPopup = createPlaceholderPopup("Merchant Shop", "Dice & Boosts Merchant is coming soon!\nSpend Gold to unlock higher tier Dice.")
-	local rebirthPopup = createPlaceholderPopup("Rebirth Chamber", "Rebirth system unlocks permanent Gold & Luck multipliers.")
 	local indexPopup = createPlaceholderPopup("Blade Codex", "View all discovered Swords, Grades, and Auras in your collection.")
 
 	-- 3. Side Menu: Left vertical stack: Shop (1), Dice (2), Rebirth (3), Index (4)
@@ -439,11 +439,13 @@ function MainHUD.new(parentGui: Instance): MainHUDInstance
 		end,
 	})
 
+	local onRebirthCallback: (() -> ())? = nil
+
 	createHudImageButton({
 		Name = "RebirthButton",
 		Text = "Rebirth",
 		AssetKey = "Rebirth",
-		FallbackIcon = "🌀",
+		FallbackIcon = "R",
 		FallbackBgColor = Theme.Colors.ButtonSecondary,
 		BorderColor = Theme.Colors.AuraPurple,
 		Size = UDim2.new(0, 60, 0, 60),
@@ -451,7 +453,9 @@ function MainHUD.new(parentGui: Instance): MainHUDInstance
 		LayoutOrder = 3,
 		Parent = sideContainer,
 		OnClick = function()
-			rebirthPopup:Open()
+			if onRebirthCallback then
+				onRebirthCallback()
+			end
 		end,
 	})
 
@@ -1114,6 +1118,9 @@ function MainHUD.new(parentGui: Instance): MainHUDInstance
 		end,
 		SetOnDice = function(_, callback: () -> ())
 			onDiceCallback = callback
+		end,
+		SetOnRebirth = function(_, callback: () -> ())
+			onRebirthCallback = callback
 		end,
 		ShowRollPopup = function(_, swordDef: any, isAutoSold: boolean?)
 			showRollPopup(swordDef, isAutoSold)
