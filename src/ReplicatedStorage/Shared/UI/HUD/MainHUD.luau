@@ -130,6 +130,24 @@ local function createHudImageButton(config: HudButtonConfig): ImageButton
 			ColorSequenceKeypoint.new(1.00, Color3.fromRGB(255, 65, 95)),
 		})
 		grad.Parent = face
+
+		-- Prominent spinning light sunburst rays behind shop icon
+		local rays = Instance.new("ImageLabel")
+		rays.Name = "SpinningRays"
+		rays.Size = UDim2.new(2.4, 0, 2.4, 0)
+		rays.Position = UDim2.new(0.5, 0, 0.40, 0)
+		rays.AnchorPoint = Vector2.new(0.5, 0.5)
+		rays.BackgroundTransparency = 1
+		rays.Image = "rbxassetid://76566560352940"
+		rays.ImageColor3 = Color3.fromRGB(255, 255, 210)
+		rays.ImageTransparency = 0.08
+		rays.ZIndex = 1
+		rays.Parent = face
+
+		local spinTween = TweenService:Create(rays, TweenInfo.new(8, Enum.EasingStyle.Linear, Enum.EasingDirection.InOut, -1), {
+			Rotation = 360,
+		})
+		spinTween:Play()
 	elseif bgStyle == "RedChecker" then
 		face.BackgroundColor3 = Color3.fromRGB(225, 55, 75)
 		local checker = Instance.new("ImageLabel")

@@ -26,7 +26,7 @@ local Assets: AssetRegistry = {
 	-- Background card / plate images (leave blank "" for fallback styled shape)
 	Plates = {
 		Default = "",
-		Shop = "rbxassetid://114505581952233",
+		Shop = "rbxassetid://111060493624490",
 		Rebirth = "rbxassetid://99418679601643",
 		Index = "rbxassetid://110329880068770",
 		Swords = "",
@@ -36,7 +36,7 @@ local Assets: AssetRegistry = {
 
 	-- Foreground icon images (leave blank "" for placeholder icon)
 	Icons = {
-		Shop = "rbxassetid://114505581952233",
+		Shop = "rbxassetid://111060493624490",
 		Rebirth = "rbxassetid://99418679601643",
 		Index = "rbxassetid://110329880068770",
 		Swords = "",
