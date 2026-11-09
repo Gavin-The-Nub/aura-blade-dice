@@ -55,6 +55,8 @@ type HudButtonConfig = {
 	TextColor: Color3?,
 	Size: UDim2,
 	CornerRadius: UDim?,
+	IconSize: UDim2?,
+	IconPosition: UDim2?,
 	LayoutOrder: number?,
 	Parent: Instance,
 	OnClick: () -> (),
@@ -182,8 +184,8 @@ local function createHudImageButton(config: HudButtonConfig): ImageButton
 	if iconAsset ~= "" then
 		local iconImage = Instance.new("ImageLabel")
 		iconImage.Name = "IconImage"
-		iconImage.Size = if hasSpecialBg then UDim2.new(0.82, 0, 0.70, 0) else UDim2.new(0.65, 0, 0.52, 0)
-		iconImage.Position = if hasSpecialBg then UDim2.new(0.5, 0, 0.05, 0) else UDim2.new(0.5, 0, 0.08, 0)
+		iconImage.Size = config.IconSize or (if hasSpecialBg then UDim2.new(0.82, 0, 0.70, 0) else UDim2.new(0.65, 0, 0.52, 0))
+		iconImage.Position = config.IconPosition or (if hasSpecialBg then UDim2.new(0.5, 0, 0.05, 0) else UDim2.new(0.5, 0, 0.08, 0))
 		iconImage.AnchorPoint = Vector2.new(0.5, 0)
 		iconImage.BackgroundTransparency = 1
 		iconImage.ScaleType = Enum.ScaleType.Fit
@@ -612,7 +614,7 @@ function MainHUD.new(parentGui: Instance): MainHUDInstance
 	-- 3. Side Menu: Left vertical stack: Shop (1), Rebirth (2), Index (3) [Dice button removed]
 	local sideContainer = Instance.new("Frame")
 	sideContainer.Name = "SideMenu"
-	sideContainer.Size = UDim2.new(0, 72, 0, 240)
+	sideContainer.Size = UDim2.new(0, 74, 0, 246)
 	sideContainer.Position = UDim2.new(0, 16, 0.45, 0)
 	sideContainer.AnchorPoint = Vector2.new(0, 0.5)
 	sideContainer.BackgroundTransparency = 1
@@ -636,8 +638,10 @@ function MainHUD.new(parentGui: Instance): MainHUDInstance
 		FallbackIcon = "🛍️",
 		FallbackBgColor = Theme.Colors.ButtonSecondary,
 		BorderColor = Theme.Colors.AuraCrimson,
-		Size = UDim2.new(0, 68, 0, 72),
+		Size = UDim2.new(0, 70, 0, 74),
 		CornerRadius = UDim.new(0, 14),
+		IconSize = UDim2.new(1.20, 0, 0.98, 0),
+		IconPosition = UDim2.new(0.5, 0, -0.06, 0),
 		LayoutOrder = 1,
 		Parent = sideContainer,
 		OnClick = function()
@@ -656,8 +660,10 @@ function MainHUD.new(parentGui: Instance): MainHUDInstance
 		FallbackIcon = "R",
 		FallbackBgColor = Theme.Colors.ButtonSecondary,
 		BorderColor = Theme.Colors.AuraPurple,
-		Size = UDim2.new(0, 68, 0, 72),
+		Size = UDim2.new(0, 70, 0, 74),
 		CornerRadius = UDim.new(0, 14),
+		IconSize = UDim2.new(0.82, 0, 0.68, 0),
+		IconPosition = UDim2.new(0.5, 0, 0.05, 0),
 		LayoutOrder = 2,
 		Parent = sideContainer,
 		OnClick = function()
@@ -676,8 +682,10 @@ function MainHUD.new(parentGui: Instance): MainHUDInstance
 		FallbackIcon = "📖",
 		FallbackBgColor = Theme.Colors.ButtonSecondary,
 		BorderColor = Theme.Colors.AuraCyan,
-		Size = UDim2.new(0, 68, 0, 72),
+		Size = UDim2.new(0, 70, 0, 74),
 		CornerRadius = UDim.new(0, 14),
+		IconSize = UDim2.new(0.82, 0, 0.68, 0),
+		IconPosition = UDim2.new(0.5, 0, 0.05, 0),
 		LayoutOrder = 3,
 		Parent = sideContainer,
 		OnClick = function()
