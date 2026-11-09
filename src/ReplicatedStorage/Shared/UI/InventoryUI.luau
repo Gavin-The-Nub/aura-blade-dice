@@ -32,15 +32,19 @@ export type OwnedSwordEntry = {
 }
 
 export type InventoryUIInstance = {
-	Open: (self: InventoryUIInstance) -> (),
+	Open: (self: InventoryUIInstance, initialTab: ("Swords" | "Items")?) -> (),
 	Close: (self: InventoryUIInstance) -> (),
 	SetData: (
 		self: InventoryUIInstance,
 		ownedSwords: { OwnedSwordEntry },
 		equippedUid: string,
 		autoSellRules: { [string]: boolean },
-		placedSwords: { [string]: string }?
+		placedSwords: { [string]: string }?,
+		gems: number?,
+		tokens: number?
 	) -> (),
+	SetItemData: (self: InventoryUIInstance, gems: number, tokens: number) -> (),
+	SetTab: (self: InventoryUIInstance, tab: "Swords" | "Items") -> (),
 	SetOnEquip: (self: InventoryUIInstance, callback: (uid: string) -> ()) -> (),
 	SetOnUnequip: (self: InventoryUIInstance, callback: () -> ()) -> (),
 	SetOnSell: (self: InventoryUIInstance, callback: (uid: string) -> ()) -> (),
@@ -82,11 +86,11 @@ function InventoryUI.new(parentGui: Instance): InventoryUIInstance
 	-- Forward reference for close callback
 	local onCloseCallback: (() -> ())? = nil
 
-	-- Main Inventory Modal
+	-- Main Backpack Modal
 	local popup = Popup.new({
-		Title = "Swords & Inventory",
-		Size = UDim2.new(0.92, 0, 0.85, 0),
-		MaxWidth = 680,
+		Title = "Backpack",
+		Size = UDim2.new(0.92, 0, 0.86, 0),
+		MaxWidth = 740,
 		MaxHeight = 520,
 		Parent = screenGui,
 		OnClose = function()
@@ -98,13 +102,153 @@ function InventoryUI.new(parentGui: Instance): InventoryUIInstance
 
 	local rootContent = popup.Content
 
+	-- Left Tab Strip (Vertical)
+	local tabStrip = Instance.new("Frame")
+	tabStrip.Name = "TabStrip"
+	tabStrip.Size = UDim2.new(0, 68, 1, 0)
+	tabStrip.Position = UDim2.new(0, 0, 0, 0)
+	tabStrip.BackgroundTransparency = 1
+	tabStrip.Parent = rootContent
+
+	local tabList = Instance.new("UIListLayout")
+	tabList.FillDirection = Enum.FillDirection.Vertical
+	tabList.SortOrder = Enum.SortOrder.LayoutOrder
+	tabList.Padding = UDim.new(0, 8)
+	tabList.Parent = tabStrip
+
+	-- Main View Container
+	local mainContainer = Instance.new("Frame")
+	mainContainer.Name = "MainContainer"
+	mainContainer.Size = UDim2.new(1, -76, 1, 0)
+	mainContainer.Position = UDim2.new(0, 76, 0, 0)
+	mainContainer.BackgroundTransparency = 1
+	mainContainer.Parent = rootContent
+
+	-- Swords View
+	local swordsView = Instance.new("Frame")
+	swordsView.Name = "SwordsView"
+	swordsView.Size = UDim2.new(1, 0, 1, 0)
+	swordsView.BackgroundTransparency = 1
+	swordsView.Visible = true
+	swordsView.Parent = mainContainer
+
+	-- Items View
+	local itemsView = Instance.new("Frame")
+	itemsView.Name = "ItemsView"
+	itemsView.Size = UDim2.new(1, 0, 1, 0)
+	itemsView.BackgroundTransparency = 1
+	itemsView.Visible = false
+	itemsView.Parent = mainContainer
+
+	local function createTabButton(name: string, label: string, iconText: string, layoutOrder: number)
+		local btn = Instance.new("ImageButton")
+		btn.Name = name .. "TabButton"
+		btn.Size = UDim2.new(1, 0, 0, 64)
+		btn.LayoutOrder = layoutOrder
+		btn.AutoButtonColor = false
+		btn.BackgroundColor3 = Theme.Colors.BackgroundDark
+		btn.BorderSizePixel = 0
+		btn.Parent = tabStrip
+
+		local corner = Instance.new("UICorner")
+		corner.CornerRadius = Theme.Corner.Medium
+		corner.Parent = btn
+
+		local stroke = Instance.new("UIStroke")
+		stroke.Color = Theme.Colors.Border
+		stroke.Thickness = 1
+		stroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+		stroke.Parent = btn
+
+		local icon = Instance.new("TextLabel")
+		icon.Name = "Icon"
+		icon.Size = UDim2.new(1, 0, 0, 30)
+		icon.Position = UDim2.new(0, 0, 0, 6)
+		icon.BackgroundTransparency = 1
+		icon.Font = Theme.Fonts.Title
+		icon.TextSize = 22
+		icon.TextColor3 = Theme.Colors.TextMuted
+		icon.Text = iconText
+		icon.Parent = btn
+
+		local text = Instance.new("TextLabel")
+		text.Name = "Label"
+		text.Size = UDim2.new(1, 0, 0, 18)
+		text.Position = UDim2.new(0, 0, 0, 38)
+		text.BackgroundTransparency = 1
+		text.Font = Theme.Fonts.Button
+		text.TextSize = 11
+		text.TextColor3 = Theme.Colors.TextMuted
+		text.Text = label
+		text.Parent = btn
+
+		return {
+			Button = btn,
+			Stroke = stroke,
+			Icon = icon,
+			Label = text,
+		}
+	end
+
+	local swordsTab = createTabButton("Swords", "Swords", "🗡️", 1)
+	local itemsTab = createTabButton("Items", "Items", "🎒", 2)
+
+	local currentTab: "Swords" | "Items" = "Swords"
+	local rebuildItemsGrid: () -> () -- forward reference
+
+	local function setTab(tab: "Swords" | "Items")
+		currentTab = tab
+		if tab == "Swords" then
+			swordsTab.Button.BackgroundColor3 = Theme.Colors.ButtonPrimary
+			swordsTab.Stroke.Color = Theme.Colors.AuraCyan
+			swordsTab.Stroke.Thickness = 2
+			swordsTab.Icon.TextColor3 = Theme.Colors.TextPrimary
+			swordsTab.Label.TextColor3 = Theme.Colors.TextPrimary
+
+			itemsTab.Button.BackgroundColor3 = Theme.Colors.BackgroundDark
+			itemsTab.Stroke.Color = Theme.Colors.Border
+			itemsTab.Stroke.Thickness = 1
+			itemsTab.Icon.TextColor3 = Theme.Colors.TextMuted
+			itemsTab.Label.TextColor3 = Theme.Colors.TextMuted
+
+			swordsView.Visible = true
+			itemsView.Visible = false
+		else
+			itemsTab.Button.BackgroundColor3 = Theme.Colors.ButtonPrimary
+			itemsTab.Stroke.Color = Theme.Colors.AuraPurple
+			itemsTab.Stroke.Thickness = 2
+			itemsTab.Icon.TextColor3 = Theme.Colors.TextPrimary
+			itemsTab.Label.TextColor3 = Theme.Colors.TextPrimary
+
+			swordsTab.Button.BackgroundColor3 = Theme.Colors.BackgroundDark
+			swordsTab.Stroke.Color = Theme.Colors.Border
+			swordsTab.Stroke.Thickness = 1
+			swordsTab.Icon.TextColor3 = Theme.Colors.TextMuted
+			swordsTab.Label.TextColor3 = Theme.Colors.TextMuted
+
+			swordsView.Visible = false
+			itemsView.Visible = true
+			if rebuildItemsGrid then
+				rebuildItemsGrid()
+			end
+		end
+	end
+
+	swordsTab.Button.MouseButton1Click:Connect(function()
+		setTab("Swords")
+	end)
+
+	itemsTab.Button.MouseButton1Click:Connect(function()
+		setTab("Items")
+	end)
+
 	-- Top Bar: Capacity + Equip Best on Row 1; Auto-Sell Header on Row 2; Rarity Chips on Row 3
 	local topBar = Instance.new("Frame")
 	topBar.Name = "TopBar"
 	topBar.Size = UDim2.new(1, 0, 0, 80)
 	topBar.Position = UDim2.new(0, 0, 0, 0)
 	topBar.BackgroundTransparency = 1
-	topBar.Parent = rootContent
+	topBar.Parent = swordsView
 
 	local countLabel = Instance.new("TextLabel")
 	countLabel.Name = "CountLabel"
@@ -177,7 +321,7 @@ function InventoryUI.new(parentGui: Instance): InventoryUIInstance
 	body.Size = UDim2.new(1, 0, 1, -84)
 	body.Position = UDim2.new(0, 0, 0, 84)
 	body.BackgroundTransparency = 1
-	body.Parent = rootContent
+	body.Parent = swordsView
 
 	-- Left: Grid container
 	local gridPanel = Panel.new({
@@ -347,9 +491,9 @@ function InventoryUI.new(parentGui: Instance): InventoryUIInstance
 	toastFrame.BackgroundColor3 = Theme.Colors.PanelBackground
 	toastFrame.BackgroundTransparency = 0.05
 	toastFrame.BorderSizePixel = 0
-	toastFrame.ZIndex = 25
+	toastFrame.ZIndex = 35
 	toastFrame.Visible = false
-	toastFrame.Parent = rootContent
+	toastFrame.Parent = mainContainer
 
 	local toastCorner = Instance.new("UICorner")
 	toastCorner.CornerRadius = Theme.Corner.Small
@@ -502,12 +646,352 @@ function InventoryUI.new(parentGui: Instance): InventoryUIInstance
 		Parent = sellConfirmActions,
 	})
 
+	-- Items View: Top Bar
+	local itemsTopBar = Instance.new("Frame")
+	itemsTopBar.Name = "ItemsTopBar"
+	itemsTopBar.Size = UDim2.new(1, 0, 0, 32)
+	itemsTopBar.Position = UDim2.new(0, 0, 0, 0)
+	itemsTopBar.BackgroundTransparency = 1
+	itemsTopBar.Parent = itemsView
+
+	local itemsTitle = Instance.new("TextLabel")
+	itemsTitle.Name = "ItemsTitle"
+	itemsTitle.Size = UDim2.new(0.6, 0, 0, 18)
+	itemsTitle.Position = UDim2.new(0, 4, 0, 0)
+	itemsTitle.BackgroundTransparency = 1
+	itemsTitle.Font = Theme.Fonts.Title
+	itemsTitle.TextSize = 13
+	itemsTitle.TextColor3 = Theme.Colors.TextGold
+	itemsTitle.TextXAlignment = Enum.TextXAlignment.Left
+	itemsTitle.Text = "ITEMS & CURRENCIES"
+	itemsTitle.Parent = itemsTopBar
+
+	local itemsSubtitle = Instance.new("TextLabel")
+	itemsSubtitle.Name = "ItemsSubtitle"
+	itemsSubtitle.Size = UDim2.new(1, -8, 0, 14)
+	itemsSubtitle.Position = UDim2.new(0, 4, 0, 16)
+	itemsSubtitle.BackgroundTransparency = 1
+	itemsSubtitle.Font = Theme.Fonts.Body
+	itemsSubtitle.TextSize = 10
+	itemsSubtitle.TextColor3 = Theme.Colors.TextMuted
+	itemsSubtitle.TextXAlignment = Enum.TextXAlignment.Left
+	itemsSubtitle.Text = "Collectible tokens, gems, and stackable items in your backpack."
+	itemsSubtitle.Parent = itemsTopBar
+
+	-- Items Body: Left Items Grid (63%), Right Items Inspector (35%)
+	local itemsBody = Instance.new("Frame")
+	itemsBody.Name = "ItemsBody"
+	itemsBody.Size = UDim2.new(1, 0, 1, -38)
+	itemsBody.Position = UDim2.new(0, 0, 0, 38)
+	itemsBody.BackgroundTransparency = 1
+	itemsBody.Parent = itemsView
+
+	-- Left: Items Grid Panel
+	local itemsGridPanel = Panel.new({
+		Name = "ItemsGridPanel",
+		Size = UDim2.new(0.63, 0, 1, 0),
+		Position = UDim2.new(0, 0, 0, 0),
+		BackgroundColor = Theme.Colors.BackgroundDark,
+		BorderColor = Theme.Colors.Border,
+		Padding = UDim.new(0, 6),
+		Parent = itemsBody,
+	})
+
+	local itemsGridScroll = Instance.new("ScrollingFrame")
+	itemsGridScroll.Name = "ItemsGridScroll"
+	itemsGridScroll.Size = UDim2.new(1, 0, 1, 0)
+	itemsGridScroll.BackgroundTransparency = 1
+	itemsGridScroll.ScrollBarThickness = 4
+	itemsGridScroll.ScrollBarImageColor3 = Theme.Colors.AuraPurple
+	itemsGridScroll.CanvasSize = UDim2.new(0, 0, 0, 0)
+	itemsGridScroll.AutomaticCanvasSize = Enum.AutomaticSize.Y
+	itemsGridScroll.Parent = itemsGridPanel.Content
+
+	local itemsGridLayout = Instance.new("UIGridLayout")
+	itemsGridLayout.CellSize = UDim2.new(0, 72, 0, 80)
+	itemsGridLayout.CellPadding = UDim2.new(0, 6, 0, 6)
+	itemsGridLayout.SortOrder = Enum.SortOrder.LayoutOrder
+	itemsGridLayout.Parent = itemsGridScroll
+
+	-- Right: Items Inspector Detail Panel
+	local itemsInspectorPanel = Panel.new({
+		Name = "ItemsInspectorPanel",
+		Size = UDim2.new(0.35, 0, 1, 0),
+		Position = UDim2.new(0.65, 0, 0, 0),
+		BackgroundColor = Theme.Colors.PanelBackground,
+		BorderColor = Theme.Colors.Border,
+		Padding = UDim.new(0, 10),
+		Parent = itemsBody,
+	})
+
+	local itemInspContent = itemsInspectorPanel.Content
+
+	local itemInspName = Instance.new("TextLabel")
+	itemInspName.Name = "ItemInspName"
+	itemInspName.Size = UDim2.new(1, 0, 0, 22)
+	itemInspName.Position = UDim2.new(0, 0, 0, 2)
+	itemInspName.BackgroundTransparency = 1
+	itemInspName.Font = Theme.Fonts.Title
+	itemInspName.TextSize = 16
+	itemInspName.TextColor3 = Theme.Colors.TextPrimary
+	itemInspName.TextTruncate = Enum.TextTruncate.AtEnd
+	itemInspName.Text = "Item Details"
+	itemInspName.Parent = itemInspContent
+
+	local itemInspCategory = Instance.new("TextLabel")
+	itemInspCategory.Name = "ItemInspCategory"
+	itemInspCategory.Size = UDim2.new(1, 0, 0, 16)
+	itemInspCategory.Position = UDim2.new(0, 0, 0, 24)
+	itemInspCategory.BackgroundTransparency = 1
+	itemInspCategory.Font = Theme.Fonts.Button
+	itemInspCategory.TextSize = 10
+	itemInspCategory.TextColor3 = Theme.Colors.AuraCyan
+	itemInspCategory.Text = "CURRENCY"
+	itemInspCategory.Parent = itemInspContent
+
+	local itemInspIconFrame = Instance.new("Frame")
+	itemInspIconFrame.Name = "ItemInspIconFrame"
+	itemInspIconFrame.Size = UDim2.new(0, 64, 0, 64)
+	itemInspIconFrame.Position = UDim2.new(0.5, 0, 0, 48)
+	itemInspIconFrame.AnchorPoint = Vector2.new(0.5, 0)
+	itemInspIconFrame.BackgroundColor3 = Theme.Colors.BackgroundDark
+	itemInspIconFrame.Parent = itemInspContent
+
+	local itemInspIconCorner = Instance.new("UICorner")
+	itemInspIconCorner.CornerRadius = Theme.Corner.Medium
+	itemInspIconCorner.Parent = itemInspIconFrame
+
+	local itemInspIconStroke = Instance.new("UIStroke")
+	itemInspIconStroke.Name = "IconStroke"
+	itemInspIconStroke.Color = Theme.Colors.AuraCyan
+	itemInspIconStroke.Thickness = 1.5
+	itemInspIconStroke.Parent = itemInspIconFrame
+
+	local itemInspIconLabel = Instance.new("TextLabel")
+	itemInspIconLabel.Name = "IconLabel"
+	itemInspIconLabel.Size = UDim2.new(1, 0, 1, 0)
+	itemInspIconLabel.BackgroundTransparency = 1
+	itemInspIconLabel.Font = Theme.Fonts.Title
+	itemInspIconLabel.TextSize = 34
+	itemInspIconLabel.Text = "💎"
+	itemInspIconLabel.Parent = itemInspIconFrame
+
+	local itemInspCount = Instance.new("TextLabel")
+	itemInspCount.Name = "ItemInspCount"
+	itemInspCount.Size = UDim2.new(1, 0, 0, 20)
+	itemInspCount.Position = UDim2.new(0, 0, 0, 120)
+	itemInspCount.BackgroundTransparency = 1
+	itemInspCount.Font = Theme.Fonts.Title
+	itemInspCount.TextSize = 14
+	itemInspCount.TextColor3 = Theme.Colors.TextGold
+	itemInspCount.Text = "Owned: 0"
+	itemInspCount.Parent = itemInspContent
+
+	local itemInspDesc = Instance.new("TextLabel")
+	itemInspDesc.Name = "ItemInspDesc"
+	itemInspDesc.Size = UDim2.new(1, 0, 0, 72)
+	itemInspDesc.Position = UDim2.new(0, 0, 0, 144)
+	itemInspDesc.BackgroundTransparency = 1
+	itemInspDesc.Font = Theme.Fonts.Body
+	itemInspDesc.TextSize = 11
+	itemInspDesc.TextColor3 = Theme.Colors.TextSecondary
+	itemInspDesc.TextWrapped = true
+	itemInspDesc.TextYAlignment = Enum.TextYAlignment.Top
+	itemInspDesc.Text = ""
+	itemInspDesc.Parent = itemInspContent
+
+	local itemInspTip = Instance.new("TextLabel")
+	itemInspTip.Name = "ItemInspTip"
+	itemInspTip.Size = UDim2.new(1, 0, 0, 60)
+	itemInspTip.Position = UDim2.new(0, 0, 0, 220)
+	itemInspTip.BackgroundTransparency = 1
+	itemInspTip.Font = Theme.Fonts.Body
+	itemInspTip.TextSize = 11
+	itemInspTip.TextColor3 = Theme.Colors.AuraCyan
+	itemInspTip.TextWrapped = true
+	itemInspTip.TextYAlignment = Enum.TextYAlignment.Top
+	itemInspTip.Text = ""
+	itemInspTip.Parent = itemInspContent
+
 	-- Internal state
 	local currentOwnedSwords: { OwnedSwordEntry } = {}
 	local currentEquippedUid = ""
 	local currentPlacedSwords: { [string]: string } = {}
 	local currentAutoSellRules: { [string]: boolean } = {}
 	local selectedUid: string? = nil
+
+	local currentGems: number = 0
+	local currentTokens: number = 0
+	local selectedItemId: string = "Gems"
+
+	type ItemEntry = {
+		id: string,
+		name: string,
+		category: string,
+		icon: string,
+		borderColor: Color3,
+		description: string,
+		tip: string,
+		getAmount: () -> number,
+	}
+
+	local itemDefinitions: { ItemEntry } = {
+		{
+			id = "Gems",
+			name = "Gems",
+			category = "CURRENCY",
+			icon = "💎",
+			borderColor = Theme.Colors.AuraCyan,
+			description = "Precious radiant crystals awarded from Rebirths and boss trials. Required at the Runesmith to roll and upgrade sword Grades.",
+			tip = "💡 Visit the Runesmith station to forge Grades onto your blades (1 Gem per roll).",
+			getAmount = function()
+				return currentGems
+			end,
+		},
+		{
+			id = "EnchantTokens",
+			name = "Tickets",
+			category = "UPGRADE ITEM",
+			icon = "🎟️",
+			borderColor = Theme.Colors.AuraPurple,
+			description = "Enchanted trial tickets. Used at the Enchanter to reroll mystical passive abilities and modifiers onto your swords.",
+			tip = "💡 Visit the Enchanter station in the Plaza to enchant your weapon.",
+			getAmount = function()
+				return currentTokens
+			end,
+		},
+	}
+
+	local function updateItemsInspector()
+		local activeDef: ItemEntry? = nil
+		for _, item in itemDefinitions do
+			if item.id == selectedItemId then
+				activeDef = item
+				break
+			end
+		end
+		if not activeDef then
+			activeDef = itemDefinitions[1]
+			if activeDef then
+				selectedItemId = activeDef.id
+			end
+		end
+
+		if activeDef then
+			itemInspName.Text = activeDef.name
+			itemInspCategory.Text = activeDef.category
+			itemInspCategory.TextColor3 = activeDef.borderColor
+			itemInspIconLabel.Text = activeDef.icon
+			itemInspIconStroke.Color = activeDef.borderColor
+			itemInspCount.Text = "Owned: " .. NumberFormat.format(activeDef.getAmount())
+			itemInspDesc.Text = activeDef.description
+			itemInspTip.Text = activeDef.tip
+		end
+	end
+
+	rebuildItemsGrid = function()
+		for _, child in itemsGridScroll:GetChildren() do
+			if not child:IsA("UIGridLayout") then
+				child:Destroy()
+			end
+		end
+
+		for idx, item in ipairs(itemDefinitions) do
+			local amount = item.getAmount()
+			local isSelected = (item.id == selectedItemId)
+
+			local card = Instance.new("ImageButton")
+			card.Name = "Item_" .. item.id
+			card.Size = UDim2.new(0, 72, 0, 80)
+			card.BackgroundColor3 = if isSelected then Theme.Colors.ButtonPrimary else Theme.Colors.BackgroundDark
+			card.AutoButtonColor = false
+			card.LayoutOrder = idx
+			card.Parent = itemsGridScroll
+
+			local cardCorner = Instance.new("UICorner")
+			cardCorner.CornerRadius = Theme.Corner.Medium
+			cardCorner.Parent = card
+
+			local cardStroke = Instance.new("UIStroke")
+			cardStroke.Color = if isSelected then Theme.Colors.AuraGold else item.borderColor
+			cardStroke.Thickness = if isSelected then 2.5 else 1.5
+			cardStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+			cardStroke.Parent = card
+
+			local iconLabel = Instance.new("TextLabel")
+			iconLabel.Name = "Icon"
+			iconLabel.Size = UDim2.new(1, 0, 0, 36)
+			iconLabel.Position = UDim2.new(0, 0, 0, 8)
+			iconLabel.BackgroundTransparency = 1
+			iconLabel.Font = Theme.Fonts.Title
+			iconLabel.TextSize = 28
+			iconLabel.Text = item.icon
+			iconLabel.Parent = card
+
+			local nameLabel = Instance.new("TextLabel")
+			nameLabel.Name = "Name"
+			nameLabel.Size = UDim2.new(1, -6, 0, 14)
+			nameLabel.Position = UDim2.new(0.5, 0, 0, 44)
+			nameLabel.AnchorPoint = Vector2.new(0.5, 0)
+			nameLabel.BackgroundTransparency = 1
+			nameLabel.Font = Theme.Fonts.Button
+			nameLabel.TextSize = 10
+			nameLabel.TextColor3 = Theme.Colors.TextPrimary
+			nameLabel.TextTruncate = Enum.TextTruncate.AtEnd
+			nameLabel.Text = item.name
+			nameLabel.Parent = card
+
+			local countLabel = Instance.new("TextLabel")
+			countLabel.Name = "Count"
+			countLabel.Size = UDim2.new(1, -8, 0, 16)
+			countLabel.Position = UDim2.new(1, -4, 1, -4)
+			countLabel.AnchorPoint = Vector2.new(1, 1)
+			countLabel.BackgroundTransparency = 1
+			countLabel.Font = Theme.Fonts.Number
+			countLabel.TextSize = 12
+			countLabel.TextColor3 = Theme.Colors.TextGold
+			countLabel.TextXAlignment = Enum.TextXAlignment.Right
+			countLabel.Text = "x" .. NumberFormat.format(amount)
+			countLabel.Parent = card
+
+			local countStroke = Instance.new("UIStroke")
+			countStroke.Color = Theme.TextStroke.Color
+			countStroke.Thickness = 1.5
+			countStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Contextual
+			countStroke.Parent = countLabel
+
+			card.MouseButton1Click:Connect(function()
+				selectedItemId = item.id
+				rebuildItemsGrid()
+				updateItemsInspector()
+			end)
+		end
+
+		-- Visual empty slots to fill out the backpack grid
+		local totalSlotsToShow = math.max(16, #itemDefinitions + 10)
+		for i = #itemDefinitions + 1, totalSlotsToShow do
+			local slot = Instance.new("Frame")
+			slot.Name = "EmptySlot_" .. i
+			slot.Size = UDim2.new(0, 72, 0, 80)
+			slot.BackgroundColor3 = Theme.Colors.BackgroundDark
+			slot.BackgroundTransparency = 0.55
+			slot.LayoutOrder = i
+			slot.Parent = itemsGridScroll
+
+			local slotCorner = Instance.new("UICorner")
+			slotCorner.CornerRadius = Theme.Corner.Medium
+			slotCorner.Parent = slot
+
+			local slotStroke = Instance.new("UIStroke")
+			slotStroke.Color = Theme.Colors.Border
+			slotStroke.Thickness = 1
+			slotStroke.Transparency = 0.5
+			slotStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+			slotStroke.Parent = slot
+		end
+
+		updateItemsInspector()
+	end
 
 	local onEquipCallback: ((string) -> ())? = nil
 	local onUnequipCallback: (() -> ())? = nil
@@ -1017,7 +1501,10 @@ function InventoryUI.new(parentGui: Instance): InventoryUIInstance
 	end)
 
 	local self: InventoryUIInstance = {
-		Open = function(_)
+		Open = function(_, initialTab: ("Swords" | "Items")?)
+			if initialTab then
+				setTab(initialTab)
+			end
 			popup:Open()
 		end,
 		Close = function(_)
@@ -1027,11 +1514,25 @@ function InventoryUI.new(parentGui: Instance): InventoryUIInstance
 				onCloseCallback()
 			end
 		end,
-		SetData = function(_, ownedSwords: { OwnedSwordEntry }, equippedUid: string, autoSellRules: { [string]: boolean }, placedSwords: { [string]: string }?)
+		SetData = function(
+			_,
+			ownedSwords: { OwnedSwordEntry },
+			equippedUid: string,
+			autoSellRules: { [string]: boolean },
+			placedSwords: { [string]: string }?,
+			gems: number?,
+			tokens: number?
+		)
 			currentOwnedSwords = ownedSwords or {}
 			currentEquippedUid = equippedUid or ""
 			currentAutoSellRules = autoSellRules or {}
 			currentPlacedSwords = placedSwords or {}
+			if type(gems) == "number" then
+				currentGems = gems
+			end
+			if type(tokens) == "number" then
+				currentTokens = tokens
+			end
 
 			-- Cleanly deselect if the selected sword was sold or removed
 			local stillExists = false
@@ -1049,6 +1550,19 @@ function InventoryUI.new(parentGui: Instance): InventoryUIInstance
 
 			updateChips()
 			rebuildGrid()
+			rebuildItemsGrid()
+		end,
+		SetItemData = function(_, gems: number, tokens: number)
+			if type(gems) == "number" then
+				currentGems = gems
+			end
+			if type(tokens) == "number" then
+				currentTokens = tokens
+			end
+			rebuildItemsGrid()
+		end,
+		SetTab = function(_, tab: "Swords" | "Items")
+			setTab(tab)
 		end,
 		SetOnEquip = function(_, callback: (uid: string) -> ())
 			onEquipCallback = callback
@@ -1079,7 +1593,7 @@ function InventoryUI.new(parentGui: Instance): InventoryUIInstance
 			showFeedback(message, isSuccess)
 		end,
 		OpenAutoSell = function(this)
-			this:Open()
+			this:Open("Swords")
 		end,
 		SetOnClose = function(_, callback: () -> ())
 			onCloseCallback = callback
@@ -1096,6 +1610,8 @@ function InventoryUI.new(parentGui: Instance): InventoryUIInstance
 			equipButton:Destroy()
 			lockButton:Destroy()
 			sellButton:Destroy()
+			itemsInspectorPanel:Destroy()
+			itemsGridPanel:Destroy()
 			inspectorPanel:Destroy()
 			gridPanel:Destroy()
 			sellConfirmPopup:Destroy()
@@ -1105,6 +1621,9 @@ function InventoryUI.new(parentGui: Instance): InventoryUIInstance
 			end
 		end,
 	}
+
+	setTab("Swords")
+	rebuildItemsGrid()
 
 	return self
 end

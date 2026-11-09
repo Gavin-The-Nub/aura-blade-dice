@@ -20,17 +20,19 @@ local ownedSwords: { any } = {}
 local equippedSwordUid: string = ""
 local autoSellRules: { [string]: boolean } = {}
 local placedSwords: { [string]: string } = {}
+local currentGems: number = 0
+local currentTokens: number = 0
 local uiInstance: InventoryUI.InventoryUIInstance? = nil
 
 local function refreshUI()
 	if uiInstance then
-		uiInstance:SetData(ownedSwords, equippedSwordUid, autoSellRules, placedSwords)
+		uiInstance:SetData(ownedSwords, equippedSwordUid, autoSellRules, placedSwords, currentGems, currentTokens)
 	end
 end
 
-function InventoryController.Open()
+function InventoryController.Open(tab: ("Swords" | "Items")?)
 	if uiInstance then
-		uiInstance:Open()
+		uiInstance:Open(tab)
 	end
 end
 
@@ -40,9 +42,23 @@ function InventoryController.Close()
 	end
 end
 
-function InventoryController.Toggle()
+function InventoryController.Toggle(tab: ("Swords" | "Items")?)
 	if uiInstance then
-		uiInstance:Open()
+		uiInstance:Open(tab)
+	end
+end
+
+function InventoryController.OpenTab(tab: "Swords" | "Items")
+	if uiInstance then
+		uiInstance:Open(tab)
+	end
+end
+
+function InventoryController.SetItems(gems: number, tokens: number)
+	currentGems = gems
+	currentTokens = tokens
+	if uiInstance then
+		uiInstance:SetItemData(currentGems, currentTokens)
 	end
 end
 
@@ -195,6 +211,16 @@ function InventoryController.Init()
 		elseif key == "AutoSellRules" and type(value) == "table" then
 			autoSellRules = value :: { [string]: boolean }
 			refreshUI()
+		elseif key == "Gems" and type(value) == "number" then
+			currentGems = value :: number
+			if uiInstance then
+				uiInstance:SetItemData(currentGems, currentTokens)
+			end
+		elseif key == "EnchantTokens" and type(value) == "number" then
+			currentTokens = value :: number
+			if uiInstance then
+				uiInstance:SetItemData(currentGems, currentTokens)
+			end
 		end
 	end)
 
@@ -217,7 +243,16 @@ function InventoryController.Init()
 			if type(data.AutoSellRules) == "table" then
 				autoSellRules = data.AutoSellRules
 			end
+			if type(data.Gems) == "number" then
+				currentGems = data.Gems
+			end
+			if type(data.EnchantTokens) == "number" then
+				currentTokens = data.EnchantTokens
+			end
 			refreshUI()
+			if uiInstance then
+				uiInstance:SetItemData(currentGems, currentTokens)
+			end
 		end
 	end)
 end
