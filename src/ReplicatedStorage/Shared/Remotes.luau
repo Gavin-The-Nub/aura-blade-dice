@@ -51,6 +51,7 @@ local FUNCTIONS: { string } = {
 	"GetBlessingCost", -- client -> server: () -> number
 	"GetRebirthPreview", -- client -> server: () -> (boolean, any?, string?)
 	"ConfirmRebirth", -- client -> server: (token: string) -> (boolean, any?, string?)
+	"Teleport", -- client -> server: (destination: string) -> (boolean, string?)
 }
 
 local Remotes = {}

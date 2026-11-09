@@ -3,6 +3,7 @@
 -- Bottom-left large outlined Gold text, Left menu (Shop, Rebirth, Index),
 -- and ImageButtons with plate + icon + outlined text label.
 
+local GuiService = game:GetService("GuiService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local TweenService = game:GetService("TweenService")
 local UserInputService = game:GetService("UserInputService")
@@ -32,7 +33,7 @@ export type MainHUDInstance = {
 	SetOnRoll: (self: MainHUDInstance, callback: () -> ()) -> (),
 	SetOnAutoRollToggle: (self: MainHUDInstance, callback: () -> ()) -> (),
 	SetOnBackpack: (self: MainHUDInstance, callback: () -> ()) -> (),
-	SetOnDice: (self: MainHUDInstance, callback: () -> ()) -> (),
+	SetOnTeleport: (self: MainHUDInstance, callback: (destination: string) -> ()) -> (),
 	SetOnRebirth: (self: MainHUDInstance, callback: () -> ()) -> (),
 	ShowRollPopup: (self: MainHUDInstance, swordDef: any, isAutoSold: boolean?) -> (),
 	ShowRollToast: (self: MainHUDInstance, swordOrText: any, isError: boolean?, isAutoSold: boolean?) -> (),
@@ -363,6 +364,127 @@ function MainHUD.new(parentGui: Instance): MainHUDInstance
 
 
 
+	-- 2c. Top HUD Bar: Hub, Home, Shop teleports (responsive positioning)
+	local topContainer = Instance.new("Frame")
+	topContainer.Name = "TopBarContainer"
+	topContainer.Size = UDim2.new(0, 244, 0, 36)
+	topContainer.AnchorPoint = Vector2.new(0.5, 0)
+	topContainer.BackgroundTransparency = 1
+	topContainer.ZIndex = 5
+	topContainer.Parent = root
+
+	local topLayout = Instance.new("UIListLayout")
+	topLayout.FillDirection = Enum.FillDirection.Horizontal
+	topLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+	topLayout.VerticalAlignment = Enum.VerticalAlignment.Center
+	topLayout.SortOrder = Enum.SortOrder.LayoutOrder
+	topLayout.Padding = UDim.new(0, 8)
+	topLayout.Parent = topContainer
+
+	local function updateTopBarPosition()
+		local cam = workspace.CurrentCamera
+		local vp = (cam and cam.ViewportSize) or Vector2.new(800, 600)
+		local inset = GuiService.TopbarInset
+		local barWidth = topContainer.AbsoluteSize.X
+		if barWidth <= 0 then
+			barWidth = 244
+		end
+		local barLeft = (vp.X - barWidth) / 2
+		local barRight = barLeft + barWidth
+
+		-- Overlap occurs if our top bar intersects Roblox's top-left controls (0..inset.Min.X)
+		-- or top-right controls (inset.Max.X..vp.X) while placed at top level (Y <= inset.Height)
+		local overlapsRoblox = (barLeft < inset.Min.X) or (barRight > inset.Max.X)
+		if overlapsRoblox then
+			-- Position safely below the Roblox top bar controls
+			topContainer.Position = UDim2.new(0.5, 0, 0, math.max(inset.Height, inset.Max.Y) + 6)
+		else
+			-- Plenty of room between top-left and top-right controls
+			topContainer.Position = UDim2.new(0.5, 0, 0, 10)
+		end
+	end
+	updateTopBarPosition()
+	if workspace.CurrentCamera then
+		workspace.CurrentCamera:GetPropertyChangedSignal("ViewportSize"):Connect(updateTopBarPosition)
+	end
+	GuiService:GetPropertyChangedSignal("TopbarInset"):Connect(updateTopBarPosition)
+
+	local onTeleportCallback: ((string) -> ())? = nil
+
+	local function createTopBarButton(name: string, text: string, borderColor: Color3, layoutOrder: number, onClick: () -> ()): TextButton
+		local btn = Instance.new("TextButton")
+		btn.Name = name
+		btn.Size = UDim2.new(0, 74, 0, 36)
+		btn.LayoutOrder = layoutOrder
+		btn.BackgroundColor3 = Theme.Colors.ButtonSecondary
+		btn.AutoButtonColor = false
+		btn.Text = text
+		btn.TextColor3 = Theme.Colors.TextPrimary
+		btn.Font = Theme.Fonts.Button
+		btn.TextSize = 13
+		btn.ZIndex = 6
+
+		local corner = Instance.new("UICorner")
+		corner.CornerRadius = Theme.Corner.Medium
+		corner.Parent = btn
+
+		local stroke = Instance.new("UIStroke")
+		stroke.Color = borderColor
+		stroke.Thickness = Theme.Stroke.WidthDefault
+		stroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+		stroke.Parent = btn
+
+		local textStroke = Instance.new("UIStroke")
+		textStroke.Color = Theme.TextStroke.Color
+		textStroke.Thickness = Theme.TextStroke.Thickness
+		textStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Contextual
+		textStroke.Parent = btn
+
+		local scale = Instance.new("UIScale")
+		scale.Scale = 1
+		scale.Parent = btn
+
+		btn.MouseEnter:Connect(function()
+			TweenService:Create(scale, Theme.Transitions.Fast, { Scale = 1.05 }):Play()
+		end)
+		btn.MouseLeave:Connect(function()
+			TweenService:Create(scale, Theme.Transitions.Fast, { Scale = 1.0 }):Play()
+		end)
+		btn.InputBegan:Connect(function(input)
+			if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+				TweenService:Create(scale, Theme.Transitions.Fast, { Scale = 0.94 }):Play()
+			end
+		end)
+		btn.InputEnded:Connect(function(input)
+			if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+				TweenService:Create(scale, Theme.Transitions.Fast, { Scale = 1.0 }):Play()
+			end
+		end)
+
+		btn.Activated:Connect(onClick)
+		btn.Parent = topContainer
+
+		return btn
+	end
+
+	createTopBarButton("HubButton", "HUB", Theme.Colors.AuraCyan, 1, function()
+		if onTeleportCallback then
+			onTeleportCallback("Hub")
+		end
+	end)
+
+	createTopBarButton("HomeButton", "HOME", Theme.Colors.AuraEmerald, 2, function()
+		if onTeleportCallback then
+			onTeleportCallback("Home")
+		end
+	end)
+
+	createTopBarButton("ShopButton", "SHOP", Theme.Colors.AuraGold, 3, function()
+		if onTeleportCallback then
+			onTeleportCallback("Shop")
+		end
+	end)
+
 	local function createPlaceholderPopup(title: string, desc: string): Popup.PopupComponent
 		local popup = Popup.new({
 			Title = title,
@@ -385,10 +507,10 @@ function MainHUD.new(parentGui: Instance): MainHUDInstance
 	local shopPopup = createPlaceholderPopup("Merchant Shop", "Dice & Boosts Merchant is coming soon!\nSpend Gold to unlock higher tier Dice.")
 	local indexPopup = createPlaceholderPopup("Blade Codex", "View all discovered Swords, Grades, and Auras in your collection.")
 
-	-- 3. Side Menu: Left vertical stack: Shop (1), Dice (2), Rebirth (3), Index (4)
+	-- 3. Side Menu: Left vertical stack: Shop (1), Rebirth (2), Index (3) [Dice button removed]
 	local sideContainer = Instance.new("Frame")
 	sideContainer.Name = "SideMenu"
-	sideContainer.Size = UDim2.new(0, 68, 0, 280)
+	sideContainer.Size = UDim2.new(0, 68, 0, 210)
 	sideContainer.Position = UDim2.new(0, 16, 0.45, 0)
 	sideContainer.AnchorPoint = Vector2.new(0, 0.5)
 	sideContainer.BackgroundTransparency = 1
@@ -419,26 +541,6 @@ function MainHUD.new(parentGui: Instance): MainHUDInstance
 		end,
 	})
 
-	local onDiceCallback: (() -> ())? = nil
-
-	createHudImageButton({
-		Name = "DiceButton",
-		Text = "Dice",
-		AssetKey = "Dice",
-		FallbackIcon = "🎲",
-		FallbackBgColor = Theme.Colors.ButtonSecondary,
-		BorderColor = Theme.Colors.AuraGold,
-		Size = UDim2.new(0, 60, 0, 60),
-		CornerRadius = Theme.Corner.Medium,
-		LayoutOrder = 2,
-		Parent = sideContainer,
-		OnClick = function()
-			if onDiceCallback then
-				onDiceCallback()
-			end
-		end,
-	})
-
 	local onRebirthCallback: (() -> ())? = nil
 
 	createHudImageButton({
@@ -450,7 +552,7 @@ function MainHUD.new(parentGui: Instance): MainHUDInstance
 		BorderColor = Theme.Colors.AuraPurple,
 		Size = UDim2.new(0, 60, 0, 60),
 		CornerRadius = Theme.Corner.Medium,
-		LayoutOrder = 3,
+		LayoutOrder = 2,
 		Parent = sideContainer,
 		OnClick = function()
 			if onRebirthCallback then
@@ -468,7 +570,7 @@ function MainHUD.new(parentGui: Instance): MainHUDInstance
 		BorderColor = Theme.Colors.AuraCyan,
 		Size = UDim2.new(0, 60, 0, 60),
 		CornerRadius = Theme.Corner.Medium,
-		LayoutOrder = 4,
+		LayoutOrder = 3,
 		Parent = sideContainer,
 		OnClick = function()
 			indexPopup:Open()
@@ -1116,8 +1218,8 @@ function MainHUD.new(parentGui: Instance): MainHUDInstance
 		SetOnBackpack = function(_, callback: () -> ())
 			onBackpackCallback = callback
 		end,
-		SetOnDice = function(_, callback: () -> ())
-			onDiceCallback = callback
+		SetOnTeleport = function(_, callback: (string) -> ())
+			onTeleportCallback = callback
 		end,
 		SetOnRebirth = function(_, callback: () -> ())
 			onRebirthCallback = callback

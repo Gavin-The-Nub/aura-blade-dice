@@ -24,6 +24,7 @@ type RebirthSnapshot = {
 	gemsGrant: number,
 	targetSlots: number,
 	newGoldMult: number,
+	newLuckMult: number,
 }
 
 type RateBucket = {
@@ -39,6 +40,22 @@ local playerBuckets: { [Player]: RateBucket } = {}
 local rebirthSnapshots: { [Player]: RebirthSnapshot } = {}
 
 local RebirthService = {}
+
+local function isAutoRolling(player: Player): boolean
+	local appraiserOk, appraiser = pcall(function()
+		return require(ServerScriptService.Services.AppraiserService)
+	end)
+	if appraiserOk and appraiser and type(appraiser.IsAutoRolling) == "function" and appraiser.IsAutoRolling(player) then
+		return true
+	end
+	local enchanterOk, enchanter = pcall(function()
+		return require(ServerScriptService.Services.EnchanterService)
+	end)
+	if enchanterOk and enchanter and type(enchanter.IsAutoRolling) == "function" and enchanter.IsAutoRolling(player) then
+		return true
+	end
+	return false
+end
 
 local function checkRateLimit(player: Player): boolean
 	local now = os.clock()
@@ -84,6 +101,7 @@ function RebirthService.GetRebirthPreview(player: Player): (boolean, any?, strin
 
 	local currentGold = DataService.Get(player, "Gold") or 0
 	local currentGoldMult = Rebirths.GetGoldMultiplier(currentRebirths)
+	local currentLuckMult = Rebirths.GetLuckMultiplier(currentRebirths)
 	local currentSlots = DataService.Get(player, "PedestalSlots") or Rebirths.BasePedestalSlots
 
 	if currentRebirths >= Rebirths.MaxRebirths then
@@ -98,6 +116,8 @@ function RebirthService.GetRebirthPreview(player: Player): (boolean, any?, strin
 			currentGold = currentGold,
 			currentGoldMult = currentGoldMult,
 			newGoldMult = currentGoldMult,
+			currentLuckMult = currentLuckMult,
+			newLuckMult = currentLuckMult,
 			gemsGrant = 0,
 			currentSlots = currentSlots,
 			newSlots = currentSlots,
@@ -110,6 +130,7 @@ function RebirthService.GetRebirthPreview(player: Player): (boolean, any?, strin
 	local canAfford = currentGold >= cost
 
 	local newGoldMult = Rebirths.GetGoldMultiplier(nextRebirths)
+	local newLuckMult = Rebirths.GetLuckMultiplier(nextRebirths)
 	local gemsGrant = Rebirths.GetGemsGrant(nextRebirths)
 
 	local milestoneSlots = Rebirths.GetPedestalSlots(nextRebirths)
@@ -129,6 +150,8 @@ function RebirthService.GetRebirthPreview(player: Player): (boolean, any?, strin
 			currentGold = currentGold,
 			currentGoldMult = currentGoldMult,
 			newGoldMult = newGoldMult,
+			currentLuckMult = currentLuckMult,
+			newLuckMult = newLuckMult,
 			gemsGrant = gemsGrant,
 			currentSlots = currentSlots,
 			newSlots = newSlots,
@@ -150,6 +173,7 @@ function RebirthService.GetRebirthPreview(player: Player): (boolean, any?, strin
 		gemsGrant = gemsGrant,
 		targetSlots = newSlots,
 		newGoldMult = newGoldMult,
+		newLuckMult = newLuckMult,
 	}
 
 	return true, {
@@ -161,6 +185,8 @@ function RebirthService.GetRebirthPreview(player: Player): (boolean, any?, strin
 		currentGold = currentGold,
 		currentGoldMult = currentGoldMult,
 		newGoldMult = newGoldMult,
+		currentLuckMult = currentLuckMult,
+		newLuckMult = newLuckMult,
 		gemsGrant = gemsGrant,
 		currentSlots = currentSlots,
 		newSlots = newSlots,
@@ -184,8 +210,18 @@ function RebirthService.ConfirmRebirth(player: Player, token: unknown): (boolean
 		return false, nil, "Data is loading..."
 	end
 
+	if isAutoRolling(player) then
+		return false, nil, "Stop your auto roll first."
+	end
+
 	if not PlayerActionLock.Acquire(player) then
-		return false, nil, "Another inventory or rebirth action is in progress."
+		task.wait(0.05)
+		if isAutoRolling(player) then
+			return false, nil, "Stop your auto roll first."
+		end
+		if not PlayerActionLock.Acquire(player) then
+			return false, nil, "Another inventory or rebirth action is in progress."
+		end
 	end
 
 	local ok, success, result, errMsg = pcall(function(): (boolean, any?, string?)
@@ -235,6 +271,7 @@ function RebirthService.ConfirmRebirth(player: Player, token: unknown): (boolean
 			newRebirths = snap.nextRebirths,
 			gemsAwarded = snap.gemsGrant,
 			newGoldMult = snap.newGoldMult,
+			newLuckMult = snap.newLuckMult,
 			newPedestalSlots = targetSlots,
 		}, nil
 	end)

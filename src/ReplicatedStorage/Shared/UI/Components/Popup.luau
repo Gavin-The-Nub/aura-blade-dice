@@ -28,6 +28,15 @@ export type PopupComponent = {
 
 local Popup = {}
 
+local openPopups: { [PopupComponent]: boolean } = {}
+
+-- Closes all currently open popup dialogs across the game
+function Popup.CloseAll()
+	for popup in openPopups do
+		popup:Close()
+	end
+end
+
 function Popup.new(config: PopupConfig): PopupComponent
 	-- Fullscreen dark scrim
 	local scrim = Instance.new("Frame")
@@ -120,9 +129,13 @@ function Popup.new(config: PopupConfig): PopupComponent
 	end
 
 	local isOpen = false
+	local self: PopupComponent
 
 	local function openDialog()
 		isOpen = true
+		if self then
+			openPopups[self] = true
+		end
 		scrim.Active = true
 		scrim.Visible = true
 		dialogScale.Scale = 0.8
@@ -134,9 +147,15 @@ function Popup.new(config: PopupConfig): PopupComponent
 		if not isOpen then
 			scrim.Visible = false
 			scrim.Active = false
+			if self then
+				openPopups[self] = nil
+			end
 			return
 		end
 		isOpen = false
+		if self then
+			openPopups[self] = nil
+		end
 		scrim.Active = false
 		local tween = TweenService:Create(dialogScale, Theme.Transitions.Fast, { Scale = 0.85 })
 		TweenService:Create(scrim, Theme.Transitions.Fast, { BackgroundTransparency = 1 }):Play()
@@ -167,7 +186,7 @@ function Popup.new(config: PopupConfig): PopupComponent
 		OnClick = closeDialog,
 	})
 
-	local self: PopupComponent = {
+	self = {
 		Instance = scrim,
 		Content = content,
 		Open = function(_)
@@ -181,6 +200,7 @@ function Popup.new(config: PopupConfig): PopupComponent
 		end,
 		Destroy = function(_)
 			isOpen = false
+			openPopups[self] = nil
 			scrim.Visible = false
 			scrim.Active = false
 			closeBtn:Destroy()

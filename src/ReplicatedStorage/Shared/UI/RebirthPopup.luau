@@ -22,6 +22,8 @@ export type RebirthPreviewData = {
 	currentGold: number,
 	currentGoldMult: number,
 	newGoldMult: number,
+	currentLuckMult: number?,
+	newLuckMult: number?,
 	gemsGrant: number,
 	currentSlots: number,
 	newSlots: number,
@@ -48,13 +50,16 @@ function RebirthPopup.new(parentGui: Instance): RebirthPopupInstance
 	elseif parentGui:IsA("GuiObject") then
 		host = parentGui
 	else
-		local sg = Instance.new("ScreenGui")
-		sg.Name = "RebirthPopupGui"
-		sg.ResetOnSpawn = false
-		sg.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
-		sg.DisplayOrder = 21 -- Rule 7: RebirthPopupGui DisplayOrder = 21
-		sg.Enabled = false
-		sg.Parent = parentGui
+		local sg = parentGui:FindFirstChild("RebirthPopupGui") :: ScreenGui?
+		if not sg then
+			sg = Instance.new("ScreenGui")
+			sg.Name = "RebirthPopupGui"
+			sg.ResetOnSpawn = false
+			sg.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+			sg.DisplayOrder = 21 -- Rule 7: RebirthPopupGui DisplayOrder = 21
+			sg.Enabled = false
+			sg.Parent = parentGui
+		end
 		screenGui = sg
 		host = sg
 	end
@@ -138,7 +143,7 @@ function RebirthPopup.new(parentGui: Instance): RebirthPopupInstance
 	-- 2. Benefits Overview Card
 	local benefitsCard = Instance.new("Frame")
 	benefitsCard.Name = "BenefitsCard"
-	benefitsCard.Size = UDim2.new(1, 0, 0, 100)
+	benefitsCard.Size = UDim2.new(1, 0, 0, 126)
 	benefitsCard.BackgroundColor3 = Theme.Colors.BackgroundCard
 	benefitsCard.BorderSizePixel = 0
 	benefitsCard.LayoutOrder = 2
@@ -170,7 +175,7 @@ function RebirthPopup.new(parentGui: Instance): RebirthPopupInstance
 
 	local multLabel = Instance.new("TextLabel")
 	multLabel.Name = "MultLabel"
-	multLabel.Size = UDim2.new(1, 0, 0, 26)
+	multLabel.Size = UDim2.new(1, 0, 0, 24)
 	multLabel.BackgroundTransparency = 1
 	multLabel.Font = Theme.Fonts.Body
 	multLabel.TextSize = 13
@@ -180,28 +185,40 @@ function RebirthPopup.new(parentGui: Instance): RebirthPopupInstance
 	multLabel.LayoutOrder = 1
 	multLabel.Parent = benefitsCard
 
+	local luckLabel = Instance.new("TextLabel")
+	luckLabel.Name = "LuckLabel"
+	luckLabel.Size = UDim2.new(1, 0, 0, 24)
+	luckLabel.BackgroundTransparency = 1
+	luckLabel.Font = Theme.Fonts.Body
+	luckLabel.TextSize = 13
+	luckLabel.TextColor3 = Theme.Colors.AuraCyan
+	luckLabel.TextXAlignment = Enum.TextXAlignment.Left
+	luckLabel.Text = "Luck Multiplier: 1.0x to 1.5x (+0.5x)"
+	luckLabel.LayoutOrder = 2
+	luckLabel.Parent = benefitsCard
+
 	local gemsLabel = Instance.new("TextLabel")
 	gemsLabel.Name = "GemsLabel"
-	gemsLabel.Size = UDim2.new(1, 0, 0, 26)
+	gemsLabel.Size = UDim2.new(1, 0, 0, 24)
 	gemsLabel.BackgroundTransparency = 1
 	gemsLabel.Font = Theme.Fonts.Body
 	gemsLabel.TextSize = 13
 	gemsLabel.TextColor3 = Theme.Colors.AuraGold
 	gemsLabel.TextXAlignment = Enum.TextXAlignment.Left
 	gemsLabel.Text = "Gem Reward: +100 Gems"
-	gemsLabel.LayoutOrder = 2
+	gemsLabel.LayoutOrder = 3
 	gemsLabel.Parent = benefitsCard
 
 	local slotsLabel = Instance.new("TextLabel")
 	slotsLabel.Name = "SlotsLabel"
-	slotsLabel.Size = UDim2.new(1, 0, 0, 26)
+	slotsLabel.Size = UDim2.new(1, 0, 0, 24)
 	slotsLabel.BackgroundTransparency = 1
 	slotsLabel.Font = Theme.Fonts.Body
 	slotsLabel.TextSize = 13
 	slotsLabel.TextColor3 = Theme.Colors.AuraEmerald
 	slotsLabel.TextXAlignment = Enum.TextXAlignment.Left
 	slotsLabel.Text = "Pedestal Slots: 4 (No change)"
-	slotsLabel.LayoutOrder = 3
+	slotsLabel.LayoutOrder = 4
 	slotsLabel.Parent = benefitsCard
 
 	-- 3. Reset Warning Banner
@@ -360,6 +377,7 @@ function RebirthPopup.new(parentGui: Instance): RebirthPopupInstance
 			if data.isMaxRebirth then
 				tierLabel.Text = string.format("Current: Rebirth %d (MAX TIER)", data.currentRebirths)
 				multLabel.Text = string.format("Gold Multiplier: %.1fx (Maximum)", data.currentGoldMult)
+				luckLabel.Text = string.format("Luck Multiplier: %.1fx (Maximum)", data.currentLuckMult or data.currentGoldMult)
 				gemsLabel.Text = "Gem Reward: None (Maxed)"
 				slotsLabel.Text = string.format("Pedestal Slots: %d", data.currentSlots)
 				slotsLabel.TextColor3 = Theme.Colors.TextSecondary
@@ -371,6 +389,9 @@ function RebirthPopup.new(parentGui: Instance): RebirthPopupInstance
 			else
 				tierLabel.Text = string.format("Current: Rebirth %d to Rebirth %d", data.currentRebirths, data.nextRebirths)
 				multLabel.Text = string.format("Gold Multiplier: %.1fx to %.1fx (+%.1fx)", data.currentGoldMult, data.newGoldMult, data.newGoldMult - data.currentGoldMult)
+				local curLuck = data.currentLuckMult or 1.0
+				local nxtLuck = data.newLuckMult or 1.0
+				luckLabel.Text = string.format("Luck Multiplier: %.1fx to %.1fx (+%.1fx)", curLuck, nxtLuck, nxtLuck - curLuck)
 				gemsLabel.Text = string.format("Gem Reward: +%s Gems", NumberFormat.format(data.gemsGrant))
 
 				if data.slotChange > 0 then

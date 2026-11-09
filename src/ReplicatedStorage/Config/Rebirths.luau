@@ -45,9 +45,12 @@ function Rebirths.GetGoldMultiplier(n: number): number
 end
 
 -- Returns the permanent Luck multiplier after n rebirths.
--- Rebirth Luck is kept at 1.0 for now pending Anime Dice data [PLACEHOLDER].
-function Rebirths.GetLuckMultiplier(_n: number): number
-	return 1.0
+-- Formula: 1.0 + 0.5 * n [PLACEHOLDER]
+function Rebirths.GetLuckMultiplier(n: number): number
+	if type(n) ~= "number" or n <= 0 then
+		return 1.0
+	end
+	return 1.0 + (0.5 * math.floor(n))
 end
 
 -- Returns the Gems granted upon reaching rebirth n.

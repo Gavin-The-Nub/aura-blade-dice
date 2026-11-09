@@ -970,7 +970,7 @@ function EconSim.GetTierAutoTapGps(targetTier: number): number
 	end
 
 	local baseTapsSec = (GameConfig.AutoTap and GameConfig.AutoTap.BaseTapsPerSecond) or 10
-	local passiveRate = (GameConfig.Plot and GameConfig.Plot.PassiveRateMultiplier) or 2.0
+	local passiveRate = (GameConfig.Plot and GameConfig.Plot.PassiveRateMultiplier) or 0.5
 	local tapPortion = bestSword.baseDamage * baseTapsSec
 	local autoTapGps = tapPortion + (pedDamageSum * passiveRate)
 

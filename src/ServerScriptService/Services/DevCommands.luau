@@ -16,6 +16,7 @@ local TapService = require(ServerScriptService.Services.TapService)
 local RollService = require(ServerScriptService.Services.RollService)
 local PlotService = require(ServerScriptService.Services.PlotService)
 local InventoryService = require(ServerScriptService.Services.InventoryService)
+local WorldTeleportService = require(ServerScriptService.Services.WorldTeleportService)
 local Swords = require(ReplicatedStorage.Config.Swords)
 local Dice = require(ReplicatedStorage.Config.Dice)
 local Grades = require(ReplicatedStorage.Config.Grades)
@@ -1193,10 +1194,49 @@ local function onGoldCreditTestCommand(originTextSource: TextSource, _unfiltered
 	runGoldCreditTest(player)
 end
 
+local function onTeleportCommand(originTextSource: TextSource, unfilteredText: string)
+	local player = Players:GetPlayerByUserId(originTextSource.UserId)
+	if player == nil then
+		return
+	end
+
+	local target = unfilteredText:match("^%S+%s+(%S+)")
+	if not target then
+		say(player, "Usage: /tp <hub|home|shop>")
+		return
+	end
+
+	local lower = string.lower(target)
+	local dest: string? = nil
+	if lower == "hub" then
+		dest = "Hub"
+	elseif lower == "home" then
+		dest = "Home"
+	elseif lower == "shop" then
+		dest = "Shop"
+	else
+		say(player, "Unknown destination '" .. target .. "'. Usage: /tp <hub|home|shop>")
+		return
+	end
+
+	local success, err = WorldTeleportService.TeleportPlayer(player, dest)
+	if success then
+		say(player, ("Teleported to %s!"):format(dest))
+	else
+		say(player, ("/tp rejected: %s"):format(err or "Unknown error"))
+	end
+end
+
 function DevCommands.Start()
 	if not RunService:IsStudio() then
 		return
 	end
+
+	local tpCommand = Instance.new("TextChatCommand")
+	tpCommand.Name = "DevTpCommand"
+	tpCommand.PrimaryAlias = "/tp"
+	tpCommand.Triggered:Connect(onTeleportCommand)
+	tpCommand.Parent = TextChatService
 
 	local goldCommand = Instance.new("TextChatCommand")
 	goldCommand.Name = "DevGoldCommand"

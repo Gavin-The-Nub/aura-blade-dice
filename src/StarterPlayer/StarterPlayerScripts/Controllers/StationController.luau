@@ -144,8 +144,8 @@ local function registerStation(stationInst: Instance)
 
 		-- 4. Connect Triggered exactly once per prompt
 		if not promptConnections[prompt] then
-			local connection = prompt.Triggered:Connect(function(triggerPlayer: Player)
-				if triggerPlayer == localPlayer then
+			local connection = prompt.Triggered:Connect(function(triggerPlayer: Player?)
+				if triggerPlayer == nil or triggerPlayer == localPlayer then
 					onStationTriggered(stationType)
 				end
 			end)

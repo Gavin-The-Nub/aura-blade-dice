@@ -10,6 +10,7 @@ local ServerScriptService = game:GetService("ServerScriptService")
 local GameConfig = require(ReplicatedStorage.Config.Game)
 local Swords = require(ReplicatedStorage.Config.Swords)
 local Dice = require(ReplicatedStorage.Config.Dice)
+local Rebirths = require(ReplicatedStorage.Config.Rebirths)
 local Remotes = require(ReplicatedStorage.Shared.Remotes)
 
 local SalePrice = require(ReplicatedStorage.Shared.SalePrice)
@@ -65,13 +66,20 @@ local function getPlayerDice(player: Player): Dice.DiceDef
 	return diceMap[tier] or diceMap[1]
 end
 
--- Calculates Total Luck: Dice Base Luck × Fever (+50%) × (1 + Fortune Blessing Bonus)
+-- Calculates Total Luck: Dice Base Luck × Rebirth Luck × Fever (+50%) × (1 + Fortune Blessing Bonus)
 function RollService.GetTotalLuck(player: Player): number
 	local diceDef = getPlayerDice(player)
 	local diceLuck = diceDef.baseLuck or 1
+	local rebirthLuck = 1.0
+	if player and DataService.IsLoaded(player) then
+		local rebirths = DataService.Get(player, "Rebirths")
+		if type(rebirths) == "number" and rebirths > 0 then
+			rebirthLuck = Rebirths.GetLuckMultiplier(rebirths)
+		end
+	end
 	local feverLuck = TapService.GetLuckMultiplier(player)
 	local fortuneBonus = BlessingService.GetFortuneLuckBonus(player)
-	return diceLuck * feverLuck * (1 + fortuneBonus)
+	return diceLuck * rebirthLuck * feverLuck * (1 + fortuneBonus)
 end
 
 -- Core roll selection algorithm:

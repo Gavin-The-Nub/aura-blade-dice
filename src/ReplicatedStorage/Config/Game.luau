@@ -47,7 +47,7 @@ local Game = {
 			[10] = Vector3.new(8, 1.25, -10),
 			[11] = Vector3.new(0, 1.25, -7),
 		},
-		PassiveRateMultiplier = 2.0, -- 200% Gold-per-tap every second (placeholder)
+		PassiveRateMultiplier = 0.5, -- 50% Gold-per-tap every second (GDD Section 6)
 		OfflineIncomeCapSeconds = 8 * 3600, -- 8-hour cap (28,800 seconds)
 		MinOfflineIncomePopupThreshold = 1, -- minimum Gold to trigger offline welcome popup
 		MinOfflineSeconds = 60, -- minimum offline seconds required for popup

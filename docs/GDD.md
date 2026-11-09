@@ -185,7 +185,7 @@ Players can spend **Gold** at the Runesmith to roll a utility **Hilt Blessing** 
 Each server houses 6 to 8 personal **Player Forge Plots** ringing the main plaza.
 * **Active Main Hand (Tap Income):** The player equips their #1 strongest Sword in their hand to actively tap and slash for full Gold value.
 * **Sword Pedestals (Passive & Offline Income):** Each plot starts with **4 Sword Pedestals** and has a hard cap of **11 Pedestals** (4 start, Rebirths 3, 5, 7, 9, and 10 give +1 each, VIP Forge +2). Each plot physically has **11 pedestal models**, locked until earned. Players place their backup Swords onto unlocked pedestals.
-* **Passive Payout Rate:** Every Sword placed on a Plot Pedestal radiates its Aura upward and automatically generates **200% of its Gold-Per-Tap value every second** (placeholder, `PassiveRateMultiplier = 2.0`; including Offline Gold accumulation while the player is logged out).
+* **Passive Payout Rate:** Every Sword placed on a Plot Pedestal radiates its Aura upward and automatically generates **50% of its Gold-Per-Tap value every second** (including Offline Gold accumulation while the player is logged out).
 * **Personal Plot Target Dummy:** Positioned at the front of each plot so players can slash an interactive target with damage numbers and hit-sparks right at home.
 
 ---
@@ -196,21 +196,26 @@ Once a player accumulates enough Gold, they can trigger a **Rebirth** to permane
 
 * **What Resets:** Current Gold balance only.
 * **What Stays:** Dice (`DiceTier` and `OwnedDice`), rolled **Swords** (including Grades, Enchants, and Blessings), **Gems**, **Enchant Reroll Tokens**, **Potions**, and unlocked **Pedestal Slots** are permanently kept. (Rebirth never resets Dice).
-* **Rebirth Scaling Table (First 10 Rebirths):**  
-  *(Note: Rebirth multipliers and costs below are to be verified against Anime Dice until confirmed.)*
+* **Rebirth Scaling Table (Tiers 1 to 15 - Unverified Placeholders):**  
+  *(Note: All formulas, costs, and multipliers below are unverified placeholders defined in `Config/Rebirths.luau` pending confirmation against Anime Dice data. Formulas: Cost $= 250,000 \times 5^{n-1}$, Multipliers $= 1.0 + 0.5n$, Gems $= 100 \times n$.)*
 
-| Rebirth Level | Gold Cost | Permanent Gold Multiplier | Permanent Luck Multiplier | Bonus Reward |
-| :--- | :--- | :--- | :--- | :--- |
-| **Rebirth 1** | $250,000$ | $1.5\times$ | $1.25\times$ | $100\text{ Gems}$ |
-| **Rebirth 2** | $5\text{M}$ | $2.25\times$ | $1.5\times$ | $150\text{ Gems}$ |
-| **Rebirth 3** | $150\text{M}$ | $3.5\times$ | $2.0\times$ | $+1\text{ Plot Pedestal Slot}$ |
-| **Rebirth 4** | $5\text{B}$ | $5.0\times$ | $2.5\times$ | $300\text{ Gems}$ |
-| **Rebirth 5** | $250\text{B}$ | $7.5\times$ | $3.25\times$ | $+1\text{ Plot Pedestal Slot}$ |
-| **Rebirth 6** | $15\text{T}$ | $11.0\times$ | $4.0\times$ | $500\text{ Gems}$ |
-| **Rebirth 7** | $1\text{Qa}$ | $16.0\times$ | $5.0\times$ | $+1\text{ Plot Pedestal Slot}$ |
-| **Rebirth 8** | $85\text{Qa}$ | $24.0\times$ | $6.5\times$ | $1,000\text{ Gems}$ |
-| **Rebirth 9** | $7.5\text{Qi}$ | $35.0\times$ | $8.0\times$ | $+1\text{ Plot Pedestal Slot}$ |
-| **Rebirth 10** | $750\text{Qi}$ | $50.0\times$ | $10.0\times$ | **Ascended Aura Title** + $+1\text{ Slot}$ |
+| Rebirth Level | Gold Cost | Permanent Gold Multiplier | Permanent Luck Multiplier | Bonus Reward | Pedestal Slots |
+| :--- | :--- | :--- | :--- | :--- | :--- |
+| **Rebirth 1** | $250,000$ ($250\text{K}$) | $1.5\times$ | $1.5\times$ | $+100\text{ Gems}$ | $4\text{ Slots}$ |
+| **Rebirth 2** | $1,250,000$ ($1.25\text{M}$) | $2.0\times$ | $2.0\times$ | $+200\text{ Gems}$ | $4\text{ Slots}$ |
+| **Rebirth 3** | $6,250,000$ ($6.25\text{M}$) | $2.5\times$ | $2.5\times$ | $+300\text{ Gems}$ | $+1\text{ Slot } (5\text{ Slots})$ |
+| **Rebirth 4** | $31,250,000$ ($31.25\text{M}$) | $3.0\times$ | $3.0\times$ | $+400\text{ Gems}$ | $5\text{ Slots}$ |
+| **Rebirth 5** | $156,250,000$ ($156.25\text{M}$) | $3.5\times$ | $3.5\times$ | $+500\text{ Gems}$ | $+1\text{ Slot } (6\text{ Slots})$ |
+| **Rebirth 6** | $781,250,000$ ($781.25\text{M}$) | $4.0\times$ | $4.0\times$ | $+600\text{ Gems}$ | $6\text{ Slots}$ |
+| **Rebirth 7** | $3,906,250,000$ ($3.9\text{B}$) | $4.5\times$ | $4.5\times$ | $+700\text{ Gems}$ | $+1\text{ Slot } (7\text{ Slots})$ |
+| **Rebirth 8** | $19,531,250,000$ ($19.53\text{B}$) | $5.0\times$ | $5.0\times$ | $+800\text{ Gems}$ | $7\text{ Slots}$ |
+| **Rebirth 9** | $97,656,250,000$ ($97.65\text{B}$) | $5.5\times$ | $5.5\times$ | $+900\text{ Gems}$ | $+1\text{ Slot } (8\text{ Slots})$ |
+| **Rebirth 10** | $488,281,250,000$ ($488.28\text{B}$) | $6.0\times$ | $6.0\times$ | $+1,000\text{ Gems}$, **Ascended Aura Title** *(not implemented)* | $+1\text{ Slot } (9\text{ Slots})$ |
+| **Rebirth 11** | $2,441,406,250,000$ ($2.44\text{T}$) | $6.5\times$ | $6.5\times$ | $+1,100\text{ Gems}$ | $9\text{ Slots}$ |
+| **Rebirth 12** | $12,207,031,250,000$ ($12.2\text{T}$) | $7.0\times$ | $7.0\times$ | $+1,200\text{ Gems}$ | $9\text{ Slots}$ |
+| **Rebirth 13** | $61,035,156,250,000$ ($61.03\text{T}$) | $7.5\times$ | $7.5\times$ | $+1,300\text{ Gems}$ | $9\text{ Slots}$ |
+| **Rebirth 14** | $305,175,781,250,000$ ($305.17\text{T}$) | $8.0\times$ | $8.0\times$ | $+1,400\text{ Gems}$ | $9\text{ Slots}$ |
+| **Rebirth 15** | $1,525,878,906,250,000$ ($1.52\text{Qa}$) | $8.5\times$ | $8.5\times$ | $+1,500\text{ Gems}$ | $9\text{ Slots}$ |
 
 ---
 

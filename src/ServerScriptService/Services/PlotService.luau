@@ -22,6 +22,7 @@ local PlayerActionLock = require(ServerScriptService.PlayerActionLock)
 local PLOT_TAG = "Plot"
 local PEDESTAL_TAG = "Pedestal"
 local TARGET_DUMMY_TAG = "TargetDummy"
+local PLOT_SPAWN_TAG = "PlotSpawn"
 local DEFAULT_PLOTS_FOLDER_NAME = "Plots"
 
 local swordDefMap: { [string]: Swords.SwordDef } = {}
@@ -257,6 +258,37 @@ local function createPlaceholderDummy(plotInstance: Instance, plotId: number): M
 	return dummy
 end
 
+-- Helper to ensure a dedicated spawn marker exists on a plot
+local function ensurePlotSpawn(plotInstance: Instance, plotId: number, floor: BasePart): BasePart
+	for _, desc in plotInstance:GetDescendants() do
+		if CollectionService:HasTag(desc, PLOT_SPAWN_TAG) or desc.Name == "PlotSpawn" then
+			if desc:IsA("BasePart") then
+				desc:SetAttribute("PlotId", plotId)
+				if not CollectionService:HasTag(desc, PLOT_SPAWN_TAG) then
+					CollectionService:AddTag(desc, PLOT_SPAWN_TAG)
+				end
+				return desc
+			end
+		end
+	end
+
+	local spawnPart = Instance.new("Part")
+	spawnPart.Name = "PlotSpawn"
+	spawnPart.Size = Vector3.new(4, 0.4, 4)
+	spawnPart.CFrame = floor.CFrame * CFrame.new(0, 0.45, 6)
+	spawnPart.Anchored = true
+	spawnPart.CanCollide = false
+	spawnPart.Material = Enum.Material.SmoothPlastic
+	spawnPart.Color = Theme.Colors.BorderSubtle
+	spawnPart.TopSurface = Enum.SurfaceType.Smooth
+	spawnPart.BottomSurface = Enum.SurfaceType.Smooth
+	spawnPart:SetAttribute("PlotId", plotId)
+	CollectionService:AddTag(spawnPart, PLOT_SPAWN_TAG)
+	spawnPart.Parent = plotInstance
+
+	return spawnPart
+end
+
 -- Helper to determine pedestal slot index by SlotIndex, Slot, or part name suffix
 local function getPedestalSlot(inst: Instance): number?
 	local slotIndex = inst:GetAttribute("SlotIndex")
@@ -406,6 +438,9 @@ local function generateDefaultPlots()
 		-- Add all pedestals up to MaxPedestals using shared helper
 		ensurePlotPedestals(model, i, floor)
 
+		-- Ensure plot spawn pad
+		ensurePlotSpawn(model, i, floor)
+
 		-- Target dummy placeholder at front of plot
 		createPlaceholderDummy(model, i)
 
@@ -437,6 +472,7 @@ local function discoverPlots()
 		local floor = getPlotFloor(inst)
 		if floor then
 			ensurePlotPedestals(inst, plotId, floor)
+			ensurePlotSpawn(inst, plotId, floor)
 		else
 			warn(("[PlotService] Cannot ensure pedestals for Plot_%d: no floor part found."):format(plotId))
 		end
@@ -934,6 +970,26 @@ end
 -- Returns all registered plot instances
 function PlotService.GetAllPlots(): { [number]: Instance }
 	return registeredPlots
+end
+
+-- Returns the spawn CFrame for a specific plot ID
+function PlotService.GetPlotSpawnCFrame(plotId: number): CFrame?
+	local plotInst = registeredPlots[plotId]
+	if not plotInst then
+		return nil
+	end
+	for _, desc in plotInst:GetDescendants() do
+		if CollectionService:HasTag(desc, PLOT_SPAWN_TAG) or desc.Name == "PlotSpawn" then
+			if desc:IsA("BasePart") then
+				return desc.CFrame
+			end
+		end
+	end
+	local floor = getPlotFloor(plotInst)
+	if floor then
+		return floor.CFrame * CFrame.new(0, 1.5, 6)
+	end
+	return nil
 end
 
 function PlotService.Start()

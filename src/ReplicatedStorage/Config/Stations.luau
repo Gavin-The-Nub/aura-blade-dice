@@ -2,7 +2,7 @@
 -- Config/Stations: Central configuration for world stations.
 -- Defines prompt texts, layout positions, sizes, and Theme token names (strings only, no Color3).
 
-export type StationType = "Dice" | "Sell" | "Shop" | "Appraiser" | "Enchanter" | "Runesmith"
+export type StationType = "Dice" | "Sell" | "Shop" | "Appraiser" | "Enchanter" | "Runesmith" | "IronCitadel" | "CrimsonPagoda" | "VoidSpire"
 
 export type StationDef = {
 	Type: StationType,
@@ -13,6 +13,7 @@ export type StationDef = {
 	ColorToken: string, -- Key in Theme.Colors, e.g. "AuraGold"
 	HasModel: boolean,
 	Group: "Plaza" | "TrialGrounds",
+	PromptEnabled: boolean?,
 }
 
 export type StationsConfig = {
@@ -24,6 +25,10 @@ export type StationsConfig = {
 	SignDefaults: {
 		MaxDistance: number,
 		StudsOffset: Vector3,
+	},
+	TeleportDestinations: {
+		Hub: Vector3,
+		Shop: Vector3,
 	},
 	PlazaStations: { [StationType]: StationDef },
 	TrialGroundsMarkers: { [string]: StationDef },
@@ -40,46 +45,17 @@ local Stations: StationsConfig = {
 		MaxDistance = 45,
 		StudsOffset = Vector3.new(0, 4.5, 0),
 	},
+	TeleportDestinations = {
+		Hub = Vector3.new(0, 1.5, 0),
+		Shop = Vector3.new(0, 1.5, -135),
+	},
 	PlazaStations = {
-		Dice = {
-			Type = "Dice",
-			ActionText = "Roll",
-			ObjectText = "Dice Merchant",
-			-- North of SpawnLocation (0, 0.5, 0, size 12x12), clear of plots at radius 80
-			Position = Vector3.new(0, 1.5, -22),
-			Size = Vector3.new(8, 2, 8),
-			ColorToken = "AuraGold",
-			HasModel = true,
-			Group = "Plaza",
-		},
-		Sell = {
-			Type = "Sell",
-			ActionText = "Sell",
-			ObjectText = "Sell Stall",
-			-- West of SpawnLocation, clear of plots and pedestal prompts
-			Position = Vector3.new(-20, 1.5, -10),
-			Size = Vector3.new(8, 2, 8),
-			ColorToken = "AuraEmerald",
-			HasModel = true,
-			Group = "Plaza",
-		},
-		Shop = {
-			Type = "Shop",
-			ActionText = "Browse",
-			ObjectText = "Shop",
-			-- East of SpawnLocation, clear of plots and pedestal prompts
-			Position = Vector3.new(20, 1.5, -10),
-			Size = Vector3.new(8, 2, 8),
-			ColorToken = "AuraCyan",
-			HasModel = true,
-			Group = "Plaza",
-		},
+		-- Central Hub stalls (center of map, leaving space for Trial entrances)
 		Appraiser = {
 			Type = "Appraiser",
 			ActionText = "Appraise",
 			ObjectText = "Master Appraiser",
-			-- South of SpawnLocation, clear of plots and pedestal prompts
-			Position = Vector3.new(0, 1.5, 22),
+			Position = Vector3.new(-16, 1.5, -10),
 			Size = Vector3.new(8, 2, 8),
 			ColorToken = "AuraPurple",
 			HasModel = true,
@@ -89,8 +65,7 @@ local Stations: StationsConfig = {
 			Type = "Enchanter",
 			ActionText = "Enchant",
 			ObjectText = "Enchanter",
-			-- South-East of SpawnLocation, clear of Shop (20, 1.5, -10) and Appraiser (0, 1.5, 22)
-			Position = Vector3.new(20, 1.5, 10),
+			Position = Vector3.new(16, 1.5, -10),
 			Size = Vector3.new(8, 2, 8),
 			ColorToken = "AuraPurple",
 			HasModel = true,
@@ -100,25 +75,78 @@ local Stations: StationsConfig = {
 			Type = "Runesmith",
 			ActionText = "Bless",
 			ObjectText = "Runesmith",
-			-- South-West of SpawnLocation, clear of Sell (-20, 1.5, -10) and Appraiser (0, 1.5, 22)
-			Position = Vector3.new(-20, 1.5, 10),
+			Position = Vector3.new(0, 1.5, 18),
 			Size = Vector3.new(8, 2, 8),
 			ColorToken = "AuraCyan",
 			HasModel = true,
 			Group = "Plaza",
 		},
+		-- Shop area stalls (outside plots perimeter at North Z = -150 to -155)
+		Dice = {
+			Type = "Dice",
+			ActionText = "Roll",
+			ObjectText = "Dice Merchant",
+			Position = Vector3.new(-30, 1.5, -150),
+			Size = Vector3.new(8, 2, 8),
+			ColorToken = "AuraGold",
+			HasModel = true,
+			Group = "Plaza",
+		},
+		Shop = {
+			Type = "Shop",
+			ActionText = "Browse",
+			ObjectText = "Shop",
+			Position = Vector3.new(0, 1.5, -155),
+			Size = Vector3.new(8, 2, 8),
+			ColorToken = "AuraCyan",
+			HasModel = true,
+			Group = "Plaza",
+		},
+		Sell = {
+			Type = "Sell",
+			ActionText = "Sell",
+			ObjectText = "Sell Stall",
+			Position = Vector3.new(30, 1.5, -150),
+			Size = Vector3.new(8, 2, 8),
+			ColorToken = "AuraEmerald",
+			HasModel = true,
+			Group = "Plaza",
+		},
 	},
 	TrialGroundsMarkers = {
-		-- Reserved marker for Trial-side group: will be moved here in later phase
-		TrialGroupReserved = {
-			Type = "Enchanter",
-			ActionText = "Enchant",
-			ObjectText = "Enchanter",
-			Position = Vector3.new(0, 1.5, 120),
+		-- Three Trial entrance markers inside the hub (radius 35-45 from hub center, >=20 studs from stalls & plots)
+		IronCitadel = {
+			Type = "IronCitadel",
+			ActionText = "Enter",
+			ObjectText = "Iron Citadel",
+			Position = Vector3.new(-38, 1.5, 15),
+			Size = Vector3.new(8, 2, 8),
+			ColorToken = "AuraEmerald",
+			HasModel = true,
+			Group = "TrialGrounds",
+			PromptEnabled = false,
+		},
+		CrimsonPagoda = {
+			Type = "CrimsonPagoda",
+			ActionText = "Enter",
+			ObjectText = "Crimson Pagoda",
+			Position = Vector3.new(38, 1.5, 15),
+			Size = Vector3.new(8, 2, 8),
+			ColorToken = "AuraCrimson",
+			HasModel = true,
+			Group = "TrialGrounds",
+			PromptEnabled = false,
+		},
+		VoidSpire = {
+			Type = "VoidSpire",
+			ActionText = "Enter",
+			ObjectText = "Void Spire",
+			Position = Vector3.new(0, 1.5, -38),
 			Size = Vector3.new(8, 2, 8),
 			ColorToken = "AuraPurple",
-			HasModel = false,
+			HasModel = true,
 			Group = "TrialGrounds",
+			PromptEnabled = false,
 		},
 	},
 	AllStations = {} :: { [StationType]: StationDef },

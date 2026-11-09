@@ -60,10 +60,12 @@ local AppraiserController = require(Controllers:WaitForChild("AppraiserControlle
 local EnchanterController = require(Controllers:WaitForChild("EnchanterController"))
 local RunesmithController = require(Controllers:WaitForChild("RunesmithController"))
 local RebirthController = require(Controllers:WaitForChild("RebirthController"))
+local TeleportController = require(Controllers:WaitForChild("TeleportController"))
 
 -- Initialize controllers with the HUD instance
 TapController.Init(hud)
 RollController.Init(hud)
+TeleportController.Init(hud)
 InventoryController.Init()
 MerchantController.Init()
 PlotController.Init()
@@ -80,8 +82,8 @@ hud:SetOnBackpack(function()
 	InventoryController.Toggle()
 end)
 
-hud:SetOnDice(function()
-	MerchantController.Toggle()
+hud:SetOnTeleport(function(destination: string)
+	TeleportController.TeleportTo(destination)
 end)
 
 hud:SetOnRebirth(function()
