@@ -41,6 +41,8 @@ export type MainHUDInstance = {
 	Destroy: (self: MainHUDInstance) -> (),
 }
 
+export type ButtonBgStyle = "Default" | "Rainbow" | "RedChecker" | "BlueChecker"
+
 type HudButtonConfig = {
 	Name: string,
 	Text: string,
@@ -48,6 +50,8 @@ type HudButtonConfig = {
 	FallbackIcon: string,
 	FallbackBgColor: Color3,
 	BorderColor: Color3,
+	BgStyle: ButtonBgStyle?,
+	BevelColor: Color3?,
 	TextColor: Color3?,
 	Size: UDim2,
 	CornerRadius: UDim?,
@@ -59,55 +63,116 @@ type HudButtonConfig = {
 local function createHudImageButton(config: HudButtonConfig): ImageButton
 	local button = Instance.new("ImageButton")
 	button.Name = config.Name
-	button.Size = config.Size or UDim2.new(0, 60, 0, 60)
+	button.Size = config.Size or UDim2.new(0, 68, 0, 72)
 	button.LayoutOrder = config.LayoutOrder or 0
 	button.AutoButtonColor = false
 	button.ClipsDescendants = false
 
 	local plates = Assets.Plates :: any
 	local icons = Assets.Icons :: any
+	local iconAsset: string = (icons and icons[config.AssetKey]) or (plates and plates[config.AssetKey]) or ""
 
-	local plateAsset: string = (plates and plates[config.AssetKey]) or (plates and plates.Default) or ""
-	local hasPlate = plateAsset ~= ""
-	if hasPlate then
-		button.Image = plateAsset
-		button.BackgroundTransparency = 1
-		button.ScaleType = Enum.ScaleType.Fit
-	else
-		button.Image = ""
-		button.BackgroundColor3 = config.FallbackBgColor
-		button.BackgroundTransparency = 0
-	end
+	local bgStyle = config.BgStyle or "Default"
+	local hasSpecialBg = bgStyle ~= "Default"
 
-	local corner = Instance.new("UICorner")
-	corner.CornerRadius = config.CornerRadius or Theme.Corner.Medium
-	corner.Parent = button
+	local bevelColor = config.BevelColor or (if bgStyle == "Rainbow" then Color3.fromRGB(25, 20, 40)
+		elseif bgStyle == "RedChecker" then Color3.fromRGB(110, 18, 30)
+		elseif bgStyle == "BlueChecker" then Color3.fromRGB(20, 45, 100)
+		else config.FallbackBgColor)
 
-	local stroke = Instance.new("UIStroke")
-	stroke.Color = config.BorderColor
-	stroke.Thickness = Theme.Stroke.WidthDefault
-	stroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
-	stroke.Enabled = not hasPlate
-	stroke.Parent = button
+	button.BackgroundColor3 = bevelColor
+	button.BackgroundTransparency = 0
+
+	local baseCorner = Instance.new("UICorner")
+	baseCorner.CornerRadius = config.CornerRadius or UDim.new(0, 14)
+	baseCorner.Parent = button
+
+	local baseStroke = Instance.new("UIStroke")
+	baseStroke.Color = Color3.fromRGB(18, 18, 22)
+	baseStroke.Thickness = 3
+	baseStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+	baseStroke.Parent = button
 
 	local scale = Instance.new("UIScale")
 	scale.Scale = 1
 	scale.Parent = button
 
-	-- 1. Icon Image (or fallback colored shape/text)
-	local iconAsset: string = (icons and icons[config.AssetKey]) or ""
+	-- 3D Face frame (sits on top, shifted up to show bottom 3D bevel)
+	local face = Instance.new("Frame")
+	face.Name = "Face"
+	face.Size = if hasSpecialBg then UDim2.new(1, 0, 1, -5) else UDim2.new(1, 0, 1, 0)
+	face.Position = UDim2.new(0, 0, 0, 0)
+	face.ClipsDescendants = true
+	face.Parent = button
+
+	local faceCorner = Instance.new("UICorner")
+	faceCorner.CornerRadius = if hasSpecialBg then UDim.new(0, 13) else (config.CornerRadius or Theme.Corner.Medium)
+	faceCorner.Parent = face
+
+	local faceStroke = Instance.new("UIStroke")
+	faceStroke.Color = if hasSpecialBg then Color3.fromRGB(18, 18, 22) else config.BorderColor
+	faceStroke.Thickness = if hasSpecialBg then 2.5 else Theme.Stroke.WidthDefault
+	faceStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+	faceStroke.Parent = face
+
+	-- Background Fill & Patterns
+	if bgStyle == "Rainbow" then
+		face.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+		local grad = Instance.new("UIGradient")
+		grad.Name = "RainbowGradient"
+		grad.Rotation = 45
+		grad.Color = ColorSequence.new({
+			ColorSequenceKeypoint.new(0.00, Color3.fromRGB(175, 65, 255)),
+			ColorSequenceKeypoint.new(0.20, Color3.fromRGB(55, 145, 255)),
+			ColorSequenceKeypoint.new(0.40, Color3.fromRGB(50, 230, 220)),
+			ColorSequenceKeypoint.new(0.60, Color3.fromRGB(80, 235, 80)),
+			ColorSequenceKeypoint.new(0.80, Color3.fromRGB(255, 230, 45)),
+			ColorSequenceKeypoint.new(1.00, Color3.fromRGB(255, 65, 95)),
+		})
+		grad.Parent = face
+	elseif bgStyle == "RedChecker" then
+		face.BackgroundColor3 = Color3.fromRGB(225, 55, 75)
+		local checker = Instance.new("ImageLabel")
+		checker.Name = "Checker"
+		checker.Size = UDim2.new(1, 0, 1, 0)
+		checker.BackgroundTransparency = 1
+		checker.Image = "rbxassetid://4632082399"
+		checker.ScaleType = Enum.ScaleType.Tile
+		checker.TileSize = UDim2.new(0, 16, 0, 16)
+		checker.ImageColor3 = Color3.fromRGB(0, 0, 0)
+		checker.ImageTransparency = 0.86
+		checker.ZIndex = 1
+		checker.Parent = face
+	elseif bgStyle == "BlueChecker" then
+		face.BackgroundColor3 = Color3.fromRGB(60, 140, 240)
+		local checker = Instance.new("ImageLabel")
+		checker.Name = "Checker"
+		checker.Size = UDim2.new(1, 0, 1, 0)
+		checker.BackgroundTransparency = 1
+		checker.Image = "rbxassetid://4632082399"
+		checker.ScaleType = Enum.ScaleType.Tile
+		checker.TileSize = UDim2.new(0, 16, 0, 16)
+		checker.ImageColor3 = Color3.fromRGB(0, 0, 0)
+		checker.ImageTransparency = 0.86
+		checker.ZIndex = 1
+		checker.Parent = face
+	else
+		face.BackgroundColor3 = config.FallbackBgColor
+	end
+
+	-- Icon Image (or fallback colored shape/text)
 	if iconAsset ~= "" then
 		local iconImage = Instance.new("ImageLabel")
 		iconImage.Name = "IconImage"
-		iconImage.Size = UDim2.new(0.65, 0, 0.52, 0)
-		iconImage.Position = UDim2.new(0.5, 0, 0.08, 0)
+		iconImage.Size = if hasSpecialBg then UDim2.new(0.82, 0, 0.70, 0) else UDim2.new(0.65, 0, 0.52, 0)
+		iconImage.Position = if hasSpecialBg then UDim2.new(0.5, 0, 0.05, 0) else UDim2.new(0.5, 0, 0.08, 0)
 		iconImage.AnchorPoint = Vector2.new(0.5, 0)
 		iconImage.BackgroundTransparency = 1
 		iconImage.ScaleType = Enum.ScaleType.Fit
 		iconImage.ZIndex = 2
 		iconImage.Image = iconAsset
-		iconImage.Parent = button
-	elseif not hasPlate then
+		iconImage.Parent = face
+	else
 		local iconImage = Instance.new("ImageLabel")
 		iconImage.Name = "IconImage"
 		iconImage.Size = UDim2.new(0.65, 0, 0.52, 0)
@@ -116,7 +181,7 @@ local function createHudImageButton(config: HudButtonConfig): ImageButton
 		iconImage.BackgroundTransparency = 1
 		iconImage.ScaleType = Enum.ScaleType.Fit
 		iconImage.ZIndex = 2
-		iconImage.Parent = button
+		iconImage.Parent = face
 
 		local fallback = Instance.new("TextLabel")
 		fallback.Name = "FallbackIcon"
@@ -129,42 +194,51 @@ local function createHudImageButton(config: HudButtonConfig): ImageButton
 		fallback.Parent = iconImage
 	end
 
-	-- 2. Outlined text label
+	-- Outlined text label
 	local textLabel = Instance.new("TextLabel")
 	textLabel.Name = "Label"
-	textLabel.Size = if hasPlate then UDim2.new(1, -2, 0, 24) else UDim2.new(1, -4, 0.36, 0)
-	textLabel.Position = if hasPlate then UDim2.new(0.5, 0, 1, -2) else UDim2.new(0.5, 0, 0.96, 0)
+	textLabel.Size = if hasSpecialBg then UDim2.new(1, -2, 0, 24) else UDim2.new(1, -4, 0.36, 0)
+	textLabel.Position = if hasSpecialBg then UDim2.new(0.5, 0, 1, -2) else UDim2.new(0.5, 0, 0.96, 0)
 	textLabel.AnchorPoint = Vector2.new(0.5, 1)
 	textLabel.BackgroundTransparency = 1
-	textLabel.Text = if hasPlate then config.Text else config.Text:upper()
-	textLabel.TextColor3 = config.TextColor or (if hasPlate then Color3.fromRGB(255, 255, 255) else Theme.Colors.TextPrimary)
-	textLabel.Font = if hasPlate then Theme.Fonts.Number else Theme.Fonts.Button
+	textLabel.Text = if hasSpecialBg then config.Text else config.Text:upper()
+	textLabel.TextColor3 = config.TextColor or (if hasSpecialBg then Color3.fromRGB(255, 255, 255) else Theme.Colors.TextPrimary)
+	textLabel.Font = if hasSpecialBg then Theme.Fonts.Number else Theme.Fonts.Button
 	textLabel.TextScaled = false
-	textLabel.TextSize = if hasPlate then 16 else 12
+	textLabel.TextSize = if hasSpecialBg then 16 else 12
 	textLabel.ZIndex = 3
-	textLabel.Parent = button
+	textLabel.Parent = face
 
 	local textStroke = Instance.new("UIStroke")
-	textStroke.Color = if hasPlate then Color3.fromRGB(15, 15, 15) else Theme.TextStroke.Color
-	textStroke.Thickness = if hasPlate then 3 else Theme.TextStroke.Thickness
+	textStroke.Color = if hasSpecialBg then Color3.fromRGB(15, 15, 18) else Theme.TextStroke.Color
+	textStroke.Thickness = if hasSpecialBg then 3.2 else Theme.TextStroke.Thickness
 	textStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Contextual
 	textStroke.Parent = textLabel
 
-	-- Micro-interactions
+	-- Micro-interactions: scale + 3D push-in effect
 	button.MouseEnter:Connect(function()
 		TweenService:Create(scale, Theme.Transitions.Fast, { Scale = 1.05 }):Play()
 	end)
 	button.MouseLeave:Connect(function()
 		TweenService:Create(scale, Theme.Transitions.Fast, { Scale = 1.0 }):Play()
+		if hasSpecialBg then
+			TweenService:Create(face, Theme.Transitions.Fast, { Position = UDim2.new(0, 0, 0, 0) }):Play()
+		end
 	end)
 	button.InputBegan:Connect(function(input)
 		if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-			TweenService:Create(scale, Theme.Transitions.Fast, { Scale = 0.93 }):Play()
+			TweenService:Create(scale, Theme.Transitions.Fast, { Scale = 0.94 }):Play()
+			if hasSpecialBg then
+				TweenService:Create(face, Theme.Transitions.Fast, { Position = UDim2.new(0, 0, 0, 3) }):Play()
+			end
 		end
 	end)
 	button.InputEnded:Connect(function(input)
 		if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
 			TweenService:Create(scale, Theme.Transitions.Fast, { Scale = 1.0 }):Play()
+			if hasSpecialBg then
+				TweenService:Create(face, Theme.Transitions.Fast, { Position = UDim2.new(0, 0, 0, 0) }):Play()
+			end
 		end
 	end)
 
@@ -539,11 +613,13 @@ function MainHUD.new(parentGui: Instance): MainHUDInstance
 		Name = "ShopButton",
 		Text = "Shop",
 		AssetKey = "Shop",
+		BgStyle = "Rainbow",
+		BevelColor = Color3.fromRGB(25, 20, 40),
 		FallbackIcon = "🛍️",
 		FallbackBgColor = Theme.Colors.ButtonSecondary,
 		BorderColor = Theme.Colors.AuraCrimson,
 		Size = UDim2.new(0, 68, 0, 72),
-		CornerRadius = Theme.Corner.Medium,
+		CornerRadius = UDim.new(0, 14),
 		LayoutOrder = 1,
 		Parent = sideContainer,
 		OnClick = function()
@@ -557,11 +633,13 @@ function MainHUD.new(parentGui: Instance): MainHUDInstance
 		Name = "RebirthButton",
 		Text = "Rebirth",
 		AssetKey = "Rebirth",
+		BgStyle = "RedChecker",
+		BevelColor = Color3.fromRGB(110, 18, 30),
 		FallbackIcon = "R",
 		FallbackBgColor = Theme.Colors.ButtonSecondary,
 		BorderColor = Theme.Colors.AuraPurple,
 		Size = UDim2.new(0, 68, 0, 72),
-		CornerRadius = Theme.Corner.Medium,
+		CornerRadius = UDim.new(0, 14),
 		LayoutOrder = 2,
 		Parent = sideContainer,
 		OnClick = function()
@@ -575,11 +653,13 @@ function MainHUD.new(parentGui: Instance): MainHUDInstance
 		Name = "IndexButton",
 		Text = "Index",
 		AssetKey = "Index",
+		BgStyle = "BlueChecker",
+		BevelColor = Color3.fromRGB(20, 45, 100),
 		FallbackIcon = "📖",
 		FallbackBgColor = Theme.Colors.ButtonSecondary,
 		BorderColor = Theme.Colors.AuraCyan,
 		Size = UDim2.new(0, 68, 0, 72),
-		CornerRadius = Theme.Corner.Medium,
+		CornerRadius = UDim.new(0, 14),
 		LayoutOrder = 3,
 		Parent = sideContainer,
 		OnClick = function()
