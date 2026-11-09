@@ -68,10 +68,11 @@ local function createHudImageButton(config: HudButtonConfig): ImageButton
 	local icons = Assets.Icons :: any
 
 	local plateAsset: string = (plates and plates[config.AssetKey]) or (plates and plates.Default) or ""
-	if plateAsset ~= "" then
+	local hasPlate = plateAsset ~= ""
+	if hasPlate then
 		button.Image = plateAsset
 		button.BackgroundTransparency = 1
-		button.ScaleType = Enum.ScaleType.Slice
+		button.ScaleType = Enum.ScaleType.Fit
 	else
 		button.Image = ""
 		button.BackgroundColor3 = config.FallbackBgColor
@@ -86,6 +87,7 @@ local function createHudImageButton(config: HudButtonConfig): ImageButton
 	stroke.Color = config.BorderColor
 	stroke.Thickness = Theme.Stroke.WidthDefault
 	stroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+	stroke.Enabled = not hasPlate
 	stroke.Parent = button
 
 	local scale = Instance.new("UIScale")
@@ -93,21 +95,29 @@ local function createHudImageButton(config: HudButtonConfig): ImageButton
 	scale.Parent = button
 
 	-- 1. Icon Image (or fallback colored shape/text)
-	local iconImage = Instance.new("ImageLabel")
-	iconImage.Name = "IconImage"
-	iconImage.Size = UDim2.new(0.65, 0, 0.52, 0)
-	iconImage.Position = UDim2.new(0.5, 0, 0.08, 0)
-	iconImage.AnchorPoint = Vector2.new(0.5, 0)
-	iconImage.BackgroundTransparency = 1
-	iconImage.ScaleType = Enum.ScaleType.Fit
-	iconImage.ZIndex = 2
-	iconImage.Parent = button
-
 	local iconAsset: string = (icons and icons[config.AssetKey]) or ""
 	if iconAsset ~= "" then
+		local iconImage = Instance.new("ImageLabel")
+		iconImage.Name = "IconImage"
+		iconImage.Size = UDim2.new(0.65, 0, 0.52, 0)
+		iconImage.Position = UDim2.new(0.5, 0, 0.08, 0)
+		iconImage.AnchorPoint = Vector2.new(0.5, 0)
+		iconImage.BackgroundTransparency = 1
+		iconImage.ScaleType = Enum.ScaleType.Fit
+		iconImage.ZIndex = 2
 		iconImage.Image = iconAsset
-	else
-		iconImage.Image = ""
+		iconImage.Parent = button
+	elseif not hasPlate then
+		local iconImage = Instance.new("ImageLabel")
+		iconImage.Name = "IconImage"
+		iconImage.Size = UDim2.new(0.65, 0, 0.52, 0)
+		iconImage.Position = UDim2.new(0.5, 0, 0.08, 0)
+		iconImage.AnchorPoint = Vector2.new(0.5, 0)
+		iconImage.BackgroundTransparency = 1
+		iconImage.ScaleType = Enum.ScaleType.Fit
+		iconImage.ZIndex = 2
+		iconImage.Parent = button
+
 		local fallback = Instance.new("TextLabel")
 		fallback.Name = "FallbackIcon"
 		fallback.Size = UDim2.new(1, 0, 1, 0)
@@ -122,21 +132,21 @@ local function createHudImageButton(config: HudButtonConfig): ImageButton
 	-- 2. Outlined text label
 	local textLabel = Instance.new("TextLabel")
 	textLabel.Name = "Label"
-	textLabel.Size = UDim2.new(1, -4, 0.36, 0)
-	textLabel.Position = UDim2.new(0.5, 0, 0.96, 0)
+	textLabel.Size = if hasPlate then UDim2.new(1, -2, 0, 24) else UDim2.new(1, -4, 0.36, 0)
+	textLabel.Position = if hasPlate then UDim2.new(0.5, 0, 1, -2) else UDim2.new(0.5, 0, 0.96, 0)
 	textLabel.AnchorPoint = Vector2.new(0.5, 1)
 	textLabel.BackgroundTransparency = 1
-	textLabel.Text = config.Text:upper()
-	textLabel.TextColor3 = config.TextColor or Theme.Colors.TextPrimary
-	textLabel.Font = Theme.Fonts.Button
+	textLabel.Text = if hasPlate then config.Text else config.Text:upper()
+	textLabel.TextColor3 = config.TextColor or (if hasPlate then Color3.fromRGB(255, 255, 255) else Theme.Colors.TextPrimary)
+	textLabel.Font = if hasPlate then Theme.Fonts.Number else Theme.Fonts.Button
 	textLabel.TextScaled = false
-	textLabel.TextSize = 12
-	textLabel.ZIndex = 2
+	textLabel.TextSize = if hasPlate then 16 else 12
+	textLabel.ZIndex = 3
 	textLabel.Parent = button
 
 	local textStroke = Instance.new("UIStroke")
-	textStroke.Color = Theme.TextStroke.Color
-	textStroke.Thickness = Theme.TextStroke.Thickness
+	textStroke.Color = if hasPlate then Color3.fromRGB(15, 15, 15) else Theme.TextStroke.Color
+	textStroke.Thickness = if hasPlate then 3 else Theme.TextStroke.Thickness
 	textStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Contextual
 	textStroke.Parent = textLabel
 
@@ -510,7 +520,7 @@ function MainHUD.new(parentGui: Instance): MainHUDInstance
 	-- 3. Side Menu: Left vertical stack: Shop (1), Rebirth (2), Index (3) [Dice button removed]
 	local sideContainer = Instance.new("Frame")
 	sideContainer.Name = "SideMenu"
-	sideContainer.Size = UDim2.new(0, 68, 0, 210)
+	sideContainer.Size = UDim2.new(0, 72, 0, 240)
 	sideContainer.Position = UDim2.new(0, 16, 0.45, 0)
 	sideContainer.AnchorPoint = Vector2.new(0, 0.5)
 	sideContainer.BackgroundTransparency = 1
@@ -522,7 +532,7 @@ function MainHUD.new(parentGui: Instance): MainHUDInstance
 	sideList.HorizontalAlignment = Enum.HorizontalAlignment.Center
 	sideList.VerticalAlignment = Enum.VerticalAlignment.Center
 	sideList.SortOrder = Enum.SortOrder.LayoutOrder
-	sideList.Padding = UDim.new(0, 12)
+	sideList.Padding = UDim.new(0, 10)
 	sideList.Parent = sideContainer
 
 	createHudImageButton({
@@ -532,7 +542,7 @@ function MainHUD.new(parentGui: Instance): MainHUDInstance
 		FallbackIcon = "🛍️",
 		FallbackBgColor = Theme.Colors.ButtonSecondary,
 		BorderColor = Theme.Colors.AuraCrimson,
-		Size = UDim2.new(0, 60, 0, 60),
+		Size = UDim2.new(0, 68, 0, 72),
 		CornerRadius = Theme.Corner.Medium,
 		LayoutOrder = 1,
 		Parent = sideContainer,
@@ -550,7 +560,7 @@ function MainHUD.new(parentGui: Instance): MainHUDInstance
 		FallbackIcon = "R",
 		FallbackBgColor = Theme.Colors.ButtonSecondary,
 		BorderColor = Theme.Colors.AuraPurple,
-		Size = UDim2.new(0, 60, 0, 60),
+		Size = UDim2.new(0, 68, 0, 72),
 		CornerRadius = Theme.Corner.Medium,
 		LayoutOrder = 2,
 		Parent = sideContainer,
@@ -568,7 +578,7 @@ function MainHUD.new(parentGui: Instance): MainHUDInstance
 		FallbackIcon = "📖",
 		FallbackBgColor = Theme.Colors.ButtonSecondary,
 		BorderColor = Theme.Colors.AuraCyan,
-		Size = UDim2.new(0, 60, 0, 60),
+		Size = UDim2.new(0, 68, 0, 72),
 		CornerRadius = Theme.Corner.Medium,
 		LayoutOrder = 3,
 		Parent = sideContainer,

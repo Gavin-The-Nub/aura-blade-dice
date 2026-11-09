@@ -68,3 +68,4 @@ The plate assets contain the button graphic and central icon without baked-in te
    - Text labels (`Shop`, `Rebirth`, `Index`) align cleanly at the base of each button.
    - No clipping or overlapping issues on small or wide screens.
    - Hover and press animations work as expected.
+

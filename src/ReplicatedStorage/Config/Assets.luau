@@ -26,9 +26,9 @@ local Assets: AssetRegistry = {
 	-- Background card / plate images (leave blank "" for fallback styled shape)
 	Plates = {
 		Default = "",
-		Shop = "",
-		Rebirth = "",
-		Index = "",
+		Shop = "rbxassetid://114505581952233",
+		Rebirth = "rbxassetid://99418679601643",
+		Index = "rbxassetid://110329880068770",
 		Swords = "",
 		Roll = "",
 		Upgrades = "",
